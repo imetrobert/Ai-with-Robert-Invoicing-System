@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 import { SERVICES } from '../lib/services'
-import { generateInvoiceNumber, calculateTotals, formatCAD } from '../lib/invoiceUtils'
+import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES } from '../lib/invoiceUtils'
 
 const EMPTY_LINE = () => ({
   _id: Math.random().toString(36).slice(2),
@@ -14,6 +14,26 @@ const EMPTY_LINE = () => ({
   people: 1,
   rate: 0,
 })
+
+// Select all text on focus — fixes iOS number input annoyance
+function NumInput({ value, onChange, min = '1', step = '1', style = {}, label }) {
+  return (
+    <div>
+      {label && <label className="form-label">{label}</label>}
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        step={step}
+        className="form-control"
+        style={style}
+        value={value}
+        onChange={onChange}
+        onFocus={e => e.target.select()}
+      />
+    </div>
+  )
+}
 
 export default function InvoiceForm() {
   const navigate = useNavigate()
@@ -28,6 +48,7 @@ export default function InvoiceForm() {
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
+  const [province, setProvince] = useState('')
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0])
   const [lineItems, setLineItems] = useState([EMPTY_LINE()])
   const [discountType, setDiscountType] = useState('none')
@@ -36,7 +57,6 @@ export default function InvoiceForm() {
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState('draft')
 
-  // Client autofill
   const [allClients, setAllClients] = useState([])
   const [clientSuggestions, setClientSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -69,6 +89,7 @@ export default function InvoiceForm() {
     setInvoiceNumber(data.invoice_number)
     setClientName(data.client_name)
     setClientEmail(data.client_email || '')
+    setProvince(data.province || '')
     setServiceDate(data.service_date)
     setLineItems(data.services?.length
       ? data.services.map(s => ({ ...s, _id: Math.random().toString(36).slice(2), people: s.people || 1 }))
@@ -102,12 +123,12 @@ export default function InvoiceForm() {
     setLineItems(prev => prev.map((item, i) =>
       i !== idx ? item : {
         ...item,
-        service_id: serviceId,
+        service_id:   serviceId,
         service_name: svc ? svc.name : '',
-        description: svc ? svc.description : '',
-        rate: svc ? svc.rate : 0,
-        quantity: 1,
-        people: 1,
+        description:  svc ? svc.description : '',
+        rate:         svc ? svc.rate : 0,
+        quantity:     1,
+        people:       1,
       }
     ))
   }
@@ -122,7 +143,9 @@ export default function InvoiceForm() {
     setLineItems(prev => prev.filter((_, i) => i !== idx))
   }
 
-  const totals = calculateTotals(lineItems, discountType, parseFloat(discountValue) || 0, gstEnabled)
+  const totals = calculateTotals(lineItems, discountType, parseFloat(discountValue) || 0, gstEnabled, province)
+  const taxLabel = getProvinceTaxLabel(province)
+  const taxRate = getProvinceTaxRate(province)
 
   async function handleSave(e) {
     e.preventDefault()
@@ -132,19 +155,20 @@ export default function InvoiceForm() {
     setError('')
 
     const payload = {
-      invoice_number: invoiceNumber,
-      client_name:    clientName.trim(),
-      client_email:   clientEmail.trim() || null,
-      service_date:   serviceDate,
-      services:       lineItems.filter(l => l.service_name),
-      discount_type:  discountType,
-      discount_value: discountType !== 'none' ? parseFloat(discountValue) || 0 : 0,
+      invoice_number:  invoiceNumber,
+      client_name:     clientName.trim(),
+      client_email:    clientEmail.trim() || null,
+      province:        province || null,
+      service_date:    serviceDate,
+      services:        lineItems.filter(l => l.service_name),
+      discount_type:   discountType,
+      discount_value:  discountType !== 'none' ? parseFloat(discountValue) || 0 : 0,
       discount_amount: totals.discountAmount,
-      gst_enabled:    gstEnabled,
-      gst_amount:     totals.gstAmount,
-      subtotal:       totals.subtotal,
-      total:          totals.total,
-      notes:          notes.trim() || null,
+      gst_enabled:     gstEnabled,
+      gst_amount:      totals.gstAmount,
+      subtotal:        totals.subtotal,
+      total:           totals.total,
+      notes:           notes.trim() || null,
       status,
     }
 
@@ -227,9 +251,19 @@ export default function InvoiceForm() {
                   <input type="email" className="form-control" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="client@email.com" />
                 </div>
               </div>
-              <div className="form-group" style={{ maxWidth: 240 }}>
-                <label className="form-label">Date of Service <span className="required">*</span></label>
-                <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
+              <div className="form-row">
+                <div className="form-group" style={{ maxWidth: 240 }}>
+                  <label className="form-label">Date of Service <span className="required">*</span></label>
+                  <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Client Province (optional)</label>
+                  <select className="form-control" value={province} onChange={e => setProvince(e.target.value)}>
+                    {CANADIAN_PROVINCES.map(p => (
+                      <option key={p.code} value={p.code}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -243,11 +277,7 @@ export default function InvoiceForm() {
                   <div key={item._id} className="line-item">
                     <div className="line-item-service">
                       <label className="form-label">Service</label>
-                      <select
-                        className="form-control"
-                        value={item.service_id}
-                        onChange={e => handleServiceSelect(idx, e.target.value)}
-                      >
+                      <select className="form-control" value={item.service_id} onChange={e => handleServiceSelect(idx, e.target.value)}>
                         <option value="">— Select a service —</option>
                         {SERVICES.map(s => (
                           <option key={s.id} value={s.id}>{s.name} ({s.rate > 0 ? formatCAD(s.rate) + s.unitLabel : 'Free'})</option>
@@ -267,39 +297,29 @@ export default function InvoiceForm() {
                       <input className="form-control" value={item.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="Add detail…" />
                     </div>
 
-                    {/* Group workshop: people + sessions */}
                     {item.service_id === 'group-workshop' ? (
                       <>
-                        <div>
-                          <label className="form-label">No. of People</label>
-                          <input
-                            type="number" min="1" step="1"
-                            className="form-control"
-                            style={{ width: 80 }}
-                            value={item.people}
-                            onChange={e => updateLine(idx, 'people', parseInt(e.target.value) || 1)}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Sessions</label>
-                          <input
-                            type="number" min="1" step="1"
-                            className="form-control"
-                            style={{ width: 80 }}
-                            value={item.quantity}
-                            onChange={e => updateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
-                          />
-                        </div>
-                        <div>
-                          <label className="form-label">Rate/Person (CAD)</label>
-                          <input
-                            type="number" min="0" step="0.01"
-                            className="form-control"
-                            style={{ width: 100 }}
-                            value={item.rate}
-                            onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
+                        <NumInput
+                          label="No. of People"
+                          value={item.people}
+                          min="1" step="1"
+                          style={{ width: 80 }}
+                          onChange={e => updateLine(idx, 'people', parseInt(e.target.value) || 1)}
+                        />
+                        <NumInput
+                          label="Sessions"
+                          value={item.quantity}
+                          min="1" step="1"
+                          style={{ width: 80 }}
+                          onChange={e => updateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
+                        />
+                        <NumInput
+                          label="Rate/Person (CAD)"
+                          value={item.rate}
+                          min="0" step="0.01"
+                          style={{ width: 100 }}
+                          onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
+                        />
                         <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
                           <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -311,26 +331,20 @@ export default function InvoiceForm() {
                       </>
                     ) : (
                       <>
-                        <div className="line-item-qty">
-                          <label className="form-label">Qty / Hrs</label>
-                          <input
-                            type="number" min="0.5" step="0.5"
-                            className="form-control"
-                            style={{ width: 72 }}
-                            value={item.quantity}
-                            onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 1)}
-                          />
-                        </div>
-                        <div className="line-item-rate">
-                          <label className="form-label">Rate (CAD)</label>
-                          <input
-                            type="number" min="0" step="0.01"
-                            className="form-control"
-                            style={{ width: 100 }}
-                            value={item.rate}
-                            onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
-                          />
-                        </div>
+                        <NumInput
+                          label="Qty / Hrs"
+                          value={item.quantity}
+                          min="0.5" step="0.5"
+                          style={{ width: 72 }}
+                          onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 1)}
+                        />
+                        <NumInput
+                          label="Rate (CAD)"
+                          value={item.rate}
+                          min="0" step="0.01"
+                          style={{ width: 100 }}
+                          onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
+                        />
                         <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
                           <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -341,7 +355,6 @@ export default function InvoiceForm() {
                   </div>
                 ))}
               </div>
-
               <button type="button" className="btn btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={addLine}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 Add Service Line
@@ -364,11 +377,13 @@ export default function InvoiceForm() {
                 </div>
                 {discountType !== 'none' && (
                   <input
-                    type="number" min="0" step={discountType === 'percent' ? '1' : '0.01'}
+                    type="number" inputMode="numeric"
+                    min="0" step={discountType === 'percent' ? '1' : '0.01'}
                     max={discountType === 'percent' ? '100' : undefined}
                     className="form-control"
                     style={{ maxWidth: 160 }}
                     value={discountValue}
+                    onFocus={e => e.target.select()}
                     onChange={e => setDiscountValue(e.target.value)}
                     placeholder={discountType === 'percent' ? 'e.g. 10' : 'e.g. 25.00'}
                   />
@@ -380,7 +395,11 @@ export default function InvoiceForm() {
                   <input type="checkbox" checked={gstEnabled} onChange={e => setGstEnabled(e.target.checked)} />
                   <span className="toggle-slider" />
                 </label>
-                <span><strong>Include GST (5%)</strong> — Currently not collected. Enable only when registered.</span>
+                <span>
+                  <strong>Include {taxLabel} {province ? `(${taxRate}%)` : ''}</strong>
+                  {!province && ' — Select a province above to calculate the correct rate.'}
+                  {province && !gstEnabled && ' — Toggle on when registered.'}
+                </span>
               </div>
 
               <div style={{ maxWidth: 300, marginLeft: 'auto' }}>
@@ -389,7 +408,7 @@ export default function InvoiceForm() {
                   <div className="totals-row" style={{ color: 'var(--success)' }}><span>Discount</span><span>-{formatCAD(totals.discountAmount)}</span></div>
                 )}
                 {gstEnabled && (
-                  <div className="totals-row"><span>GST (5%)</span><span>{formatCAD(totals.gstAmount)}</span></div>
+                  <div className="totals-row"><span>{taxLabel} ({taxRate}%)</span><span>{formatCAD(totals.gstAmount)}</span></div>
                 )}
                 <div className="totals-row total"><span>Total (CAD)</span><span>{formatCAD(totals.total)}</span></div>
               </div>
@@ -400,12 +419,7 @@ export default function InvoiceForm() {
           <div className="card" style={{ marginBottom: 20 }}>
             <div className="card-header"><h2>Notes</h2></div>
             <div className="card-body">
-              <textarea
-                className="form-control"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Any additional notes, payment instructions, or thank-you message…"
-              />
+              <textarea className="form-control" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes, payment instructions, or thank-you message…" />
             </div>
           </div>
 

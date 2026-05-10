@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 import { generateInvoicePDF, generateInvoicePDFBase64 } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
-import { formatCAD, formatDate, formatDateShort, STATUS_COLORS } from '../lib/invoiceUtils'
+import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate } from '../lib/invoiceUtils'
 
 export default function InvoiceView() {
   const { id } = useParams()
@@ -14,7 +14,7 @@ export default function InvoiceView() {
   const [loading, setLoading] = useState(true)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [emailLoading, setEmailLoading] = useState(false)
-  const [emailMsg, setEmailMsg] = useState(null) // { type: 'success'|'error', text }
+  const [emailMsg, setEmailMsg] = useState(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
@@ -46,9 +46,8 @@ export default function InvoiceView() {
     setEmailLoading(true)
     setEmailMsg(null)
     try {
-      const base64 = await generateInvoicePDFBase64(invoice)
+      const base64 = generateInvoicePDFBase64(invoice)
       await sendInvoiceEmail(invoice, base64)
-      // Mark as emailed in Supabase
       const now = new Date().toISOString()
       await supabase.from('invoices').update({ emailed_at: now }).eq('id', id)
       setInvoice(prev => ({ ...prev, emailed_at: now }))
@@ -82,6 +81,8 @@ export default function InvoiceView() {
 
   const sc = STATUS_COLORS[invoice.status] || STATUS_COLORS.draft
   const services = Array.isArray(invoice.services) ? invoice.services : []
+  const taxLabel = getProvinceTaxLabel(invoice.province)
+  const taxRate = getProvinceTaxRate(invoice.province)
 
   return (
     <div className="app-layout">
@@ -123,13 +124,8 @@ export default function InvoiceView() {
           </div>
         )}
 
-        {/* Invoice card */}
         <div className="card">
-          <div style={{
-            background: 'linear-gradient(135deg, var(--navy) 0%, #1e4a8a 100%)',
-            padding: '24px 26px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          }}>
+          <div style={{ background: 'linear-gradient(135deg, var(--navy) 0%, #1e4a8a 100%)', padding: '24px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <img src="https://aiwithrobert.com/logo.PNG" alt="" style={{ height: 44, borderRadius: 8 }} onError={e => e.target.style.display='none'} />
               <div style={{ color: 'white' }}>
@@ -150,6 +146,7 @@ export default function InvoiceView() {
                 <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--blue)', fontWeight: 700, marginBottom: 6 }}>Bill To</div>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>{invoice.client_name}</div>
                 {invoice.client_email && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{invoice.client_email}</div>}
+                {invoice.province && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{invoice.province}</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <MetaRow label="Date of Service" value={formatDate(invoice.service_date)} />
@@ -171,9 +168,7 @@ export default function InvoiceView() {
               <tbody>
                 {services.map((svc, i) => {
                   const isWorkshop = svc.service_id === 'group-workshop'
-                  const qtyLabel = isWorkshop
-                    ? `${svc.people || 1} ppl × ${svc.quantity || 1} session(s)`
-                    : String(svc.quantity || 1)
+                  const qtyLabel = isWorkshop ? `${svc.people || 1} ppl × ${svc.quantity || 1} session(s)` : String(svc.quantity || 1)
                   const amount = isWorkshop
                     ? (svc.people || 1) * (svc.quantity || 1) * (svc.rate || 0)
                     : (svc.quantity || 1) * (svc.rate || 0)
@@ -208,7 +203,10 @@ export default function InvoiceView() {
                   </div>
                 )}
                 {invoice.gst_enabled && (
-                  <div className="totals-row"><span>GST (5%)</span><span>{formatCAD(invoice.gst_amount || 0)}</span></div>
+                  <div className="totals-row">
+                    <span>{taxLabel} ({taxRate}%)</span>
+                    <span>{formatCAD(invoice.gst_amount || 0)}</span>
+                  </div>
                 )}
                 <div className="totals-row total">
                   <span>Total Due (CAD)</span>
@@ -219,20 +217,15 @@ export default function InvoiceView() {
           </div>
 
           <div style={{ background: 'var(--navy)', color: 'rgba(255,255,255,.6)', textAlign: 'center', padding: '10px 20px', fontSize: 12 }}>
-            Thank you for choosing AI with Robert! — GST/HST not applicable at this time.
+            Thank you for choosing AI with Robert! —{' '}
+            {invoice.gst_enabled ? `${taxLabel} applied at ${taxRate}%` : 'GST/QST/HST not applicable at this time.'}
           </div>
         </div>
 
-        {/* Status changer */}
         <div className="card" style={{ marginTop: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>Mark as:</span>
           {['draft', 'sent', 'paid'].map(s => (
-            <button
-              key={s}
-              className={`btn btn-sm ${invoice.status === s ? 'btn-navy' : 'btn-ghost'}`}
-              onClick={() => handleStatusChange(s)}
-              disabled={statusSaving || invoice.status === s}
-            >
+            <button key={s} className={`btn btn-sm ${invoice.status === s ? 'btn-navy' : 'btn-ghost'}`} onClick={() => handleStatusChange(s)} disabled={statusSaving || invoice.status === s}>
               {STATUS_COLORS[s].label}
             </button>
           ))}
@@ -246,9 +239,7 @@ export default function InvoiceView() {
             <p>This will permanently delete <strong>{invoice.invoice_number}</strong> for <strong>{invoice.client_name}</strong>. This cannot be undone.</p>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={() => setShowDeleteModal(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
-                {deleting ? 'Deleting…' : 'Yes, Delete'}
-              </button>
+              <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>{deleting ? 'Deleting…' : 'Yes, Delete'}</button>
             </div>
           </div>
         </div>
