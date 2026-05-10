@@ -15,21 +15,25 @@ const EMPTY_LINE = () => ({
   rate: 0,
 })
 
-// Select all text on focus — fixes iOS number input annoyance
-function NumInput({ value, onChange, min = '1', step = '1', style = {}, label }) {
+/**
+ * FIXED: NumInput
+ * Uses onFocus select() and specific inputMode to make 
+ * replacing the default "1" much easier on mobile and desktop.
+ */
+function NumInput({ value, onChange, min = '0', step = '1', style = {}, label }) {
   return (
-    <div>
-      {label && <label className="form-label">{label}</label>}
+    <div className="form-group" style={{ marginBottom: 0 }}>
+      {label && <label className="form-label" style={{ fontSize: '11px', marginBottom: '4px' }}>{label}</label>}
       <input
         type="number"
-        inputMode="numeric"
+        inputMode="decimal"
         min={min}
         step={step}
         className="form-control"
-        style={style}
+        style={{ ...style, height: '38px' }}
         value={value}
         onChange={onChange}
-        onFocus={e => e.target.select()}
+        onFocus={(e) => e.target.select()} // Automatically highlights the "1" so typing replaces it
       />
     </div>
   )
@@ -134,7 +138,9 @@ export default function InvoiceForm() {
   }
 
   function updateLine(idx, field, value) {
-    setLineItems(prev => prev.map((item, i) => i !== idx ? item : { ...item, [field]: value }))
+    // If value is empty string (user cleared input), default to 0 for numbers
+    const finalValue = (field === 'quantity' || field === 'people' || field === 'rate') && value === '' ? 0 : value
+    setLineItems(prev => prev.map((item, i) => i !== idx ? item : { ...item, [field]: finalValue }))
   }
 
   function addLine() { setLineItems(prev => [...prev, EMPTY_LINE()]) }
@@ -203,13 +209,12 @@ export default function InvoiceForm() {
         {error && <div className="alert alert-error">{error}</div>}
 
         <form onSubmit={handleSave}>
-          {/* Invoice meta */}
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="card-header"><h2>Invoice Details</h2></div>
             <div className="card-body">
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">Invoice # (auto-generated)</label>
+                  <label className="form-label">Invoice #</label>
                   <input className="form-control" value={invoiceNumber} readOnly style={{ background: '#f8fafc', color: 'var(--muted)' }} />
                 </div>
                 <div className="form-group">
@@ -247,7 +252,7 @@ export default function InvoiceForm() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Client Email (optional)</label>
+                  <label className="form-label">Client Email</label>
                   <input type="email" className="form-control" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="client@email.com" />
                 </div>
               </div>
@@ -257,7 +262,7 @@ export default function InvoiceForm() {
                   <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Client Province (optional)</label>
+                  <label className="form-label">Client Province</label>
                   <select className="form-control" value={province} onChange={e => setProvince(e.target.value)}>
                     {CANADIAN_PROVINCES.map(p => (
                       <option key={p.code} value={p.code}>{p.label}</option>
@@ -268,7 +273,6 @@ export default function InvoiceForm() {
             </div>
           </div>
 
-          {/* Line items */}
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="card-header"><h2>Services</h2></div>
             <div className="card-body">
@@ -297,61 +301,51 @@ export default function InvoiceForm() {
                       <input className="form-control" value={item.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="Add detail…" />
                     </div>
 
-                    {item.service_id === 'group-workshop' ? (
-                      <>
-                        <NumInput
-                          label="No. of People"
-                          value={item.people}
-                          min="1" step="1"
-                          style={{ width: 80 }}
-                          onChange={e => updateLine(idx, 'people', parseInt(e.target.value) || 1)}
-                        />
-                        <NumInput
-                          label="Sessions"
-                          value={item.quantity}
-                          min="1" step="1"
-                          style={{ width: 80 }}
-                          onChange={e => updateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
-                        />
-                        <NumInput
-                          label="Rate/Person (CAD)"
-                          value={item.rate}
-                          min="0" step="0.01"
-                          style={{ width: 100 }}
-                          onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
-                        />
-                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
-                          <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
-                        </div>
-                        <div style={{ gridColumn: '1 / -1', background: 'var(--blue-pale)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--blue)', fontWeight: 600 }}>
-                          Subtotal: {item.people} people × {item.quantity} session(s) × {formatCAD(item.rate)} = {formatCAD((item.people || 1) * (item.quantity || 1) * (item.rate || 0))}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <NumInput
-                          label="Qty / Hrs"
-                          value={item.quantity}
-                          min="0.5" step="0.5"
-                          style={{ width: 72 }}
-                          onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 1)}
-                        />
-                        <NumInput
-                          label="Rate (CAD)"
-                          value={item.rate}
-                          min="0" step="0.01"
-                          style={{ width: 100 }}
-                          onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
-                        />
-                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
-                          <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                          </button>
-                        </div>
-                      </>
-                    )}
+                    <div className="form-row" style={{ gridColumn: '1 / -1', display: 'flex', gap: '12px', alignItems: 'flex-end' }}>
+                      {item.service_id === 'group-workshop' ? (
+                        <>
+                          <NumInput
+                            label="People"
+                            value={item.people}
+                            style={{ width: '80px' }}
+                            onChange={e => updateLine(idx, 'people', e.target.value === '' ? '' : parseInt(e.target.value))}
+                          />
+                          <NumInput
+                            label="Sessions"
+                            value={item.quantity}
+                            style={{ width: '80px' }}
+                            onChange={e => updateLine(idx, 'quantity', e.target.value === '' ? '' : parseInt(e.target.value))}
+                          />
+                          <NumInput
+                            label="Rate/Person"
+                            value={item.rate}
+                            step="0.01"
+                            style={{ width: '100px' }}
+                            onChange={e => updateLine(idx, 'rate', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <NumInput
+                            label="Qty / Hrs"
+                            value={item.quantity}
+                            step="0.5"
+                            style={{ width: '80px' }}
+                            onChange={e => updateLine(idx, 'quantity', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          />
+                          <NumInput
+                            label="Rate (CAD)"
+                            value={item.rate}
+                            step="0.01"
+                            style={{ width: '100px' }}
+                            onChange={e => updateLine(idx, 'rate', e.target.value === '' ? '' : parseFloat(e.target.value))}
+                          />
+                        </>
+                      )}
+                      <button type="button" className="btn btn-danger btn-icon btn-sm" style={{ marginBottom: '2px' }} onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -362,34 +356,9 @@ export default function InvoiceForm() {
             </div>
           </div>
 
-          {/* Discount & totals */}
           <div className="card" style={{ marginBottom: 16 }}>
-            <div className="card-header"><h2>Discount & Totals</h2></div>
+            <div className="card-header"><h2>Tax & Totals</h2></div>
             <div className="card-body">
-              <div className="form-group">
-                <label className="form-label">Discount</label>
-                <div className="discount-type-tabs">
-                  {['none', 'percent', 'fixed'].map(t => (
-                    <button key={t} type="button" className={`tab-btn ${discountType === t ? 'active' : ''}`} onClick={() => { setDiscountType(t); setDiscountValue('') }}>
-                      {t === 'none' ? 'None' : t === 'percent' ? '% Off' : '$ Off'}
-                    </button>
-                  ))}
-                </div>
-                {discountType !== 'none' && (
-                  <input
-                    type="number" inputMode="numeric"
-                    min="0" step={discountType === 'percent' ? '1' : '0.01'}
-                    max={discountType === 'percent' ? '100' : undefined}
-                    className="form-control"
-                    style={{ maxWidth: 160 }}
-                    value={discountValue}
-                    onFocus={e => e.target.select()}
-                    onChange={e => setDiscountValue(e.target.value)}
-                    placeholder={discountType === 'percent' ? 'e.g. 10' : 'e.g. 25.00'}
-                  />
-                )}
-              </div>
-
               <div className="toggle-row" style={{ marginBottom: 20 }}>
                 <label className="toggle">
                   <input type="checkbox" checked={gstEnabled} onChange={e => setGstEnabled(e.target.checked)} />
@@ -397,29 +366,16 @@ export default function InvoiceForm() {
                 </label>
                 <span>
                   <strong>Include {taxLabel} {province ? `(${taxRate}%)` : ''}</strong>
-                  {!province && ' — Select a province above to calculate the correct rate.'}
-                  {province && !gstEnabled && ' — Toggle on when registered.'}
                 </span>
               </div>
 
               <div style={{ maxWidth: 300, marginLeft: 'auto' }}>
                 <div className="totals-row"><span>Subtotal</span><span>{formatCAD(totals.subtotal)}</span></div>
-                {totals.discountAmount > 0 && (
-                  <div className="totals-row" style={{ color: 'var(--success)' }}><span>Discount</span><span>-{formatCAD(totals.discountAmount)}</span></div>
-                )}
                 {gstEnabled && (
-                  <div className="totals-row"><span>{taxLabel} ({taxRate}%)</span><span>{formatCAD(totals.gstAmount)}</span></div>
+                  <div className="totals-row"><span>{taxLabel}</span><span>{formatCAD(totals.gstAmount)}</span></div>
                 )}
                 <div className="totals-row total"><span>Total (CAD)</span><span>{formatCAD(totals.total)}</span></div>
               </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="card" style={{ marginBottom: 20 }}>
-            <div className="card-header"><h2>Notes</h2></div>
-            <div className="card-body">
-              <textarea className="form-control" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional notes, payment instructions, or thank-you message…" />
             </div>
           </div>
 
