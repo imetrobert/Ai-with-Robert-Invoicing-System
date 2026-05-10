@@ -18,19 +18,15 @@ export async function generateInvoicePDF(invoice) {
   const pageH = doc.internal.pageSize.getHeight()
   const margin = 20
 
-  // ── Background ──────────────────────────────────────────────────────
   doc.setFillColor(...BRAND.lightGray)
   doc.rect(0, 0, pageW, pageH, 'F')
 
-  // ── Header band ─────────────────────────────────────────────────────
   doc.setFillColor(...BRAND.navy)
   doc.rect(0, 0, pageW, 44, 'F')
 
-  // Accent stripe
   doc.setFillColor(...BRAND.blue)
   doc.rect(0, 44, pageW, 3, 'F')
 
-  // Logo (fetch & embed)
   try {
     const imgData = await fetchImageAsBase64('https://aiwithrobert.com/logo.PNG')
     if (imgData) {
@@ -38,7 +34,6 @@ export async function generateInvoicePDF(invoice) {
     }
   } catch (_) { /* skip logo if fetch fails */ }
 
-  // Company name in header
   doc.setTextColor(...BRAND.white)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
@@ -48,16 +43,14 @@ export async function generateInvoicePDF(invoice) {
   doc.setFontSize(8)
   doc.setTextColor(200, 220, 255)
   doc.text('AI & Technology Training for Seniors', margin + 32, 28)
-  doc.text('Côte Saint-Luc, Quebec', margin + 32, 33)
-  doc.text('info@aiwithrobert.com  ·  514-250-8491  ·  aiwithrobert.com', margin + 32, 38)
+  doc.text('Cote Saint-Luc, Quebec', margin + 32, 33)
+  doc.text('info@aiwithrobert.com  .  514-250-8491  .  aiwithrobert.com', margin + 32, 38)
 
-  // INVOICE label
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(26)
   doc.setTextColor(...BRAND.white)
   doc.text('INVOICE', pageW - margin, 26, { align: 'right' })
 
-  // ── Invoice meta block ───────────────────────────────────────────────
   const metaY = 56
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8.5)
@@ -84,7 +77,6 @@ export async function generateInvoicePDF(invoice) {
     doc.text(value || '', col2, y)
   })
 
-  // ── Bill To ──────────────────────────────────────────────────────────
   const billY = 56
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
@@ -107,7 +99,6 @@ export async function generateInvoicePDF(invoice) {
     doc.text(invoice.client_email, margin, billY + 16)
   }
 
-  // ── Line items table ─────────────────────────────────────────────────
   const tableStartY = 88
   const services = Array.isArray(invoice.services) ? invoice.services : []
 
@@ -152,12 +143,10 @@ export async function generateInvoicePDF(invoice) {
     },
   })
 
-  // ── Totals block ─────────────────────────────────────────────────────
   const totalsY = doc.lastAutoTable.finalY + 8
   const totalsX = pageW - margin - 70
   const totalsW = 70
 
-  // Totals background
   doc.setFillColor(...BRAND.white)
   doc.roundedRect(totalsX, totalsY, totalsW, invoice.discount_amount > 0 ? (invoice.gst_enabled ? 46 : 38) : (invoice.gst_enabled ? 38 : 30), 3, 3, 'F')
 
@@ -168,7 +157,7 @@ export async function generateInvoicePDF(invoice) {
   const addTotalsRow = (label, value, bold = false) => {
     doc.setFont('helvetica', bold ? 'bold' : 'normal')
     doc.setFontSize(9)
-    doc.setTextColor(bold ? ...BRAND.dark : ...BRAND.gray)
+    doc.setTextColor(...(bold ? BRAND.dark : BRAND.gray))
     doc.text(label, leftCol, ty)
     doc.text(formatCAD(value), rightCol, ty, { align: 'right' })
     ty += 7
@@ -180,7 +169,7 @@ export async function generateInvoicePDF(invoice) {
     const label = invoice.discount_type === 'percent'
       ? `Discount (${invoice.discount_value}%)`
       : 'Discount'
-    doc.setTextColor(22, 163, 74) // green
+    doc.setTextColor(22, 163, 74)
     addTotalsRow(label, -Math.abs(invoice.discount_amount || 0))
   }
 
@@ -188,12 +177,10 @@ export async function generateInvoicePDF(invoice) {
     addTotalsRow('GST (5%)', invoice.gst_amount || 0)
   }
 
-  // Divider
   doc.setDrawColor(...BRAND.lightBlue)
   doc.setLineWidth(0.5)
   doc.line(leftCol, ty - 2, rightCol, ty - 2)
 
-  // Total
   doc.setFillColor(...BRAND.navy)
   doc.roundedRect(totalsX, ty - 1, totalsW, 12, 2, 2, 'F')
   doc.setFont('helvetica', 'bold')
@@ -202,7 +189,6 @@ export async function generateInvoicePDF(invoice) {
   doc.text('TOTAL DUE', leftCol, ty + 6.5)
   doc.text(formatCAD(invoice.total || 0), rightCol, ty + 6.5, { align: 'right' })
 
-  // ── Notes ────────────────────────────────────────────────────────────
   if (invoice.notes) {
     const notesY = totalsY
     doc.setFont('helvetica', 'bold')
@@ -216,7 +202,6 @@ export async function generateInvoicePDF(invoice) {
     doc.text(lines, margin, notesY + 7)
   }
 
-  // ── Footer ───────────────────────────────────────────────────────────
   const footY = pageH - 16
   doc.setFillColor(...BRAND.navy)
   doc.rect(0, footY, pageW, 16, 'F')
@@ -225,14 +210,12 @@ export async function generateInvoicePDF(invoice) {
   doc.setFontSize(7.5)
   doc.setTextColor(180, 200, 240)
   doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 6, { align: 'center' })
-  doc.text('aiwithrobert.com  ·  info@aiwithrobert.com  ·  514-250-8491', pageW / 2, footY + 11.5, { align: 'center' })
+  doc.text('aiwithrobert.com  .  info@aiwithrobert.com  .  514-250-8491', pageW / 2, footY + 11.5, { align: 'center' })
 
-  // GST note
   doc.setTextColor(150, 170, 210)
   doc.setFontSize(6.5)
   doc.text('GST/HST not applicable at this time.', margin, footY + 6)
 
-  // ── Save ─────────────────────────────────────────────────────────────
   const filename = `Invoice-${invoice.invoice_number}-${invoice.client_name?.replace(/\s+/g, '-')}.pdf`
   doc.save(filename)
 }
