@@ -1,3 +1,5 @@
+// File: src/lib/pdfGenerator.js
+
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatCAD, formatDate } from './invoiceUtils'
@@ -14,7 +16,6 @@ const BRAND = {
 
 // ── Logo helpers ─────────────────────────────────────────────────────────────
 
-// Full quality logo for download PDF
 async function fetchLogoFull() {
   try {
     const res = await fetch('https://aiwithrobert.com/logo.PNG')
@@ -23,7 +24,6 @@ async function fetchLogoFull() {
   } catch (_) { return null }
 }
 
-// Compressed logo for email PDF — resized to 60x60px, JPEG quality 0.35 (~2KB)
 async function fetchLogoCompressed() {
   return new Promise((resolve) => {
     const img = new Image()
@@ -34,15 +34,14 @@ async function fetchLogoCompressed() {
         canvas.width = 60
         canvas.height = 60
         const ctx = canvas.getContext('2d')
-        // Fill white background (JPEG doesn't support transparency)
-        ctx.fillStyle = '#153457'
+        ctx.fillStyle = '#153457' // Match your brand navy
         ctx.fillRect(0, 0, 60, 60)
-        // Draw logo scaled to fit
         const scale = Math.min(60 / img.width, 60 / img.height)
         const w = img.width * scale
         const h = img.height * scale
         ctx.drawImage(img, (60 - w) / 2, (60 - h) / 2, w, h)
-        resolve(canvas.toDataURL('image/jpeg', 0.35))
+        // 0.3 quality is very aggressive to save space
+        resolve(canvas.toDataURL('image/jpeg', 0.3))
       } catch (_) { resolve(null) }
     }
     img.onerror = () => resolve(null)
@@ -59,7 +58,7 @@ function blobToBase64(blob) {
   })
 }
 
-// ── Shared PDF skeleton ──────────────────────────────────────────────────────
+// ── Shared PDF construction ──────────────────────────────────────────────────
 
 function createDoc() {
   return new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
@@ -74,6 +73,7 @@ function drawHeader(doc, pageW, margin, logoData) {
   doc.rect(0, 44, pageW, 3, 'F')
 
   if (logoData) {
+    // Using 'FAST' compression for the image placement
     doc.addImage(logoData, 'JPEG', margin, 8, 28, 28, undefined, 'FAST')
   }
 
@@ -101,29 +101,38 @@ function drawBody(doc, invoice, margin, pageW) {
   _drawFooter(doc, invoice, doc.internal.pageSize.getHeight(), margin, pageW)
 }
 
-// ── Full branded PDF (download) ──────────────────────────────────────────────
-async function buildPDF(invoice) {
+// ── Main Build Logic ─────────────────────────────────────────────────────────
+
+async function buildPDF(invoice, isForEmail = false) {
   const doc = createDoc()
   const pageW = doc.internal.pageSize.getWidth()
   const margin = 20
-  const logoData = await fetchLogoFull()
+  
+  // Use compressed logo for email, full for download
+  const logoData = isForEmail ? await fetchLogoCompressed() : await fetchLogoFull()
+  
   drawHeader(doc, pageW, margin, logoData)
   drawBody(doc, invoice, margin, pageW)
+  
+  // Size Guard for EmailJS (50KB limit)
+  if (isForEmail) {
+    const output = doc.output('datauristring')
+    const sizeInKb = (output.length * 0.75) / 1024
+    
+    // If still too big, recreate without the logo as a safety fallback
+    if (sizeInKb > 48) {
+      const fallbackDoc = createDoc()
+      drawHeader(fallbackDoc, pageW, margin, null) 
+      drawBody(fallbackDoc, invoice, margin, pageW)
+      return fallbackDoc
+    }
+  }
+  
   return doc
 }
 
-// ── Email PDF — compressed logo, stays under 50KB ────────────────────────────
-async function buildEmailPDF(invoice) {
-  const doc = createDoc()
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 20
-  const logoData = await fetchLogoCompressed()
-  drawHeader(doc, pageW, margin, logoData)
-  drawBody(doc, invoice, margin, pageW)
-  return doc
-}
+// ── Shared Drawing Helpers (Stayed the same) ────────────────────────────────
 
-// ── Shared drawing helpers ───────────────────────────────────────────────────
 function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 56) {
   const col1 = pageW - margin - 80
   const col2 = col1 + 36
@@ -292,13 +301,16 @@ export function getTaxRate(province) {
 }
 
 // ── Public exports ───────────────────────────────────────────────────────────
+
+// Call this for user downloads
 export async function generateInvoicePDF(invoice) {
-  const doc = await buildPDF(invoice)
+  const doc = await buildPDF(invoice, false)
   const filename = `Invoice-${invoice.invoice_number}-${invoice.client_name?.replace(/\s+/g, '-')}.pdf`
   doc.save(filename)
 }
 
+// Call this for EmailJS
 export async function generateInvoicePDFBase64(invoice) {
-  const doc = await buildEmailPDF(invoice)
+  const doc = await buildPDF(invoice, true)
   return doc.output('datauristring')
 }
