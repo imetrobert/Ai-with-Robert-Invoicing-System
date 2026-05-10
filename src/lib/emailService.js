@@ -220,5 +220,11 @@ export async function sendInvoiceEmail(invoice) {
     html_body,     // The full HTML invoice — your EmailJS template must render this
   }
 
+  // Check payload size — EmailJS free tier limit is 50KB
+  const payloadSize = new TextEncoder().encode(JSON.stringify(templateParams)).length / 1024
+  if (payloadSize > 49) {
+    throw new Error(`Email payload is ${payloadSize.toFixed(1)}KB which exceeds EmailJS free tier 50KB limit. Upgrade to Personal plan ($9/mo) for larger emails.`)
+  }
+
   return emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
 }
