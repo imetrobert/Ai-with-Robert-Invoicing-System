@@ -13,10 +13,11 @@ export function generateInvoiceNumber(existingNumbers = []) {
   return `${prefix}${String(next).padStart(3, '0')}`
 }
 
-// Calculate invoice totals
+// Calculate invoice totals — handles group workshop (people × sessions × rate)
 export function calculateTotals(lineItems, discountType, discountValue, gstEnabled) {
   const subtotal = lineItems.reduce((sum, item) => {
-    return sum + (parseFloat(item.quantity || 1) * parseFloat(item.rate || 0))
+    const people = item.service_id === 'group-workshop' ? (parseFloat(item.people) || 1) : 1
+    return sum + (people * parseFloat(item.quantity || 1) * parseFloat(item.rate || 0))
   }, 0)
 
   let discountAmount = 0
