@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
@@ -11,6 +11,7 @@ const EMPTY_LINE = () => ({
   service_name: '',
   description: '',
   quantity: 1,
+  people: 1,
   rate: 0,
 })
 
@@ -24,26 +25,37 @@ export default function InvoiceForm() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Form state
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0])
   const [lineItems, setLineItems] = useState([EMPTY_LINE()])
-  const [discountType, setDiscountType] = useState('none') // none | percent | fixed
+  const [discountType, setDiscountType] = useState('none')
   const [discountValue, setDiscountValue] = useState('')
   const [gstEnabled, setGstEnabled] = useState(false)
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState('draft')
 
+  // Client autofill
+  const [allClients, setAllClients] = useState([])
+  const [clientSuggestions, setClientSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const clientInputRef = useRef(null)
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
-    if (isEditing) {
-      loadInvoice()
-    } else {
-      generateNumber()
-    }
+    fetchClients()
+    if (isEditing) loadInvoice()
+    else generateNumber()
   }, [id])
+
+  async function fetchClients() {
+    const { data } = await supabase.from('invoices').select('client_name').order('client_name')
+    if (data) {
+      const unique = [...new Set(data.map(r => r.client_name).filter(Boolean))]
+      setAllClients(unique)
+    }
+  }
 
   async function generateNumber() {
     const { data } = await supabase.from('invoices').select('invoice_number')
@@ -58,13 +70,31 @@ export default function InvoiceForm() {
     setClientName(data.client_name)
     setClientEmail(data.client_email || '')
     setServiceDate(data.service_date)
-    setLineItems(data.services?.length ? data.services.map(s => ({ ...s, _id: Math.random().toString(36).slice(2) })) : [EMPTY_LINE()])
+    setLineItems(data.services?.length
+      ? data.services.map(s => ({ ...s, _id: Math.random().toString(36).slice(2), people: s.people || 1 }))
+      : [EMPTY_LINE()])
     setDiscountType(data.discount_type || 'none')
     setDiscountValue(data.discount_value || '')
     setGstEnabled(data.gst_enabled || false)
     setNotes(data.notes || '')
     setStatus(data.status || 'draft')
     setLoading(false)
+  }
+
+  function handleClientInput(val) {
+    setClientName(val)
+    if (val.length > 0) {
+      const matches = allClients.filter(c => c.toLowerCase().includes(val.toLowerCase()))
+      setClientSuggestions(matches)
+      setShowSuggestions(matches.length > 0)
+    } else {
+      setShowSuggestions(false)
+    }
+  }
+
+  function selectClient(name) {
+    setClientName(name)
+    setShowSuggestions(false)
   }
 
   function handleServiceSelect(idx, serviceId) {
@@ -77,6 +107,7 @@ export default function InvoiceForm() {
         description: svc ? svc.description : '',
         rate: svc ? svc.rate : 0,
         quantity: 1,
+        people: 1,
       }
     ))
   }
@@ -102,18 +133,18 @@ export default function InvoiceForm() {
 
     const payload = {
       invoice_number: invoiceNumber,
-      client_name: clientName.trim(),
-      client_email: clientEmail.trim() || null,
-      service_date: serviceDate,
-      services: lineItems.filter(l => l.service_name),
-      discount_type: discountType,
+      client_name:    clientName.trim(),
+      client_email:   clientEmail.trim() || null,
+      service_date:   serviceDate,
+      services:       lineItems.filter(l => l.service_name),
+      discount_type:  discountType,
       discount_value: discountType !== 'none' ? parseFloat(discountValue) || 0 : 0,
       discount_amount: totals.discountAmount,
-      gst_enabled: gstEnabled,
-      gst_amount: totals.gstAmount,
-      subtotal: totals.subtotal,
-      total: totals.total,
-      notes: notes.trim() || null,
+      gst_enabled:    gstEnabled,
+      gst_amount:     totals.gstAmount,
+      subtotal:       totals.subtotal,
+      total:          totals.total,
+      notes:          notes.trim() || null,
       status,
     }
 
@@ -124,12 +155,7 @@ export default function InvoiceForm() {
       result = await supabase.from('invoices').insert([payload]).select().single()
     }
 
-    if (result.error) {
-      setError(result.error.message)
-      setSaving(false)
-      return
-    }
-
+    if (result.error) { setError(result.error.message); setSaving(false); return }
     const newId = isEditing ? id : result.data?.id
     navigate(newId ? `/invoice/${newId}` : '/')
   }
@@ -174,7 +200,27 @@ export default function InvoiceForm() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Client Name <span className="required">*</span></label>
-                  <input className="form-control" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="e.g. Marie Tremblay" required />
+                  <div className="autocomplete-wrapper">
+                    <input
+                      ref={clientInputRef}
+                      className="form-control"
+                      value={clientName}
+                      onChange={e => handleClientInput(e.target.value)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                      placeholder="e.g. Marie Tremblay"
+                      required
+                      autoComplete="off"
+                    />
+                    {showSuggestions && (
+                      <div className="autocomplete-list">
+                        {clientSuggestions.map(name => (
+                          <div key={name} className="autocomplete-item" onMouseDown={() => selectClient(name)}>
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Client Email (optional)</label>
@@ -216,38 +262,82 @@ export default function InvoiceForm() {
                       </div>
                     )}
 
-                    <div>
+                    <div style={{ gridColumn: '1 / -1' }}>
                       <label className="form-label">Description (optional)</label>
                       <input className="form-control" value={item.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="Add detail…" />
                     </div>
 
-                    <div className="line-item-qty">
-                      <label className="form-label">Qty / Hrs</label>
-                      <input
-                        type="number" min="0.5" step="0.5"
-                        className="form-control"
-                        style={{ width: 72 }}
-                        value={item.quantity}
-                        onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 1)}
-                      />
-                    </div>
-
-                    <div className="line-item-rate">
-                      <label className="form-label">Rate (CAD)</label>
-                      <input
-                        type="number" min="0" step="0.01"
-                        className="form-control"
-                        style={{ width: 100 }}
-                        value={item.rate}
-                        onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
-                      <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1} title="Remove">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                      </button>
-                    </div>
+                    {/* Group workshop: people + sessions */}
+                    {item.service_id === 'group-workshop' ? (
+                      <>
+                        <div>
+                          <label className="form-label">No. of People</label>
+                          <input
+                            type="number" min="1" step="1"
+                            className="form-control"
+                            style={{ width: 80 }}
+                            value={item.people}
+                            onChange={e => updateLine(idx, 'people', parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label">Sessions</label>
+                          <input
+                            type="number" min="1" step="1"
+                            className="form-control"
+                            style={{ width: 80 }}
+                            value={item.quantity}
+                            onChange={e => updateLine(idx, 'quantity', parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div>
+                          <label className="form-label">Rate/Person (CAD)</label>
+                          <input
+                            type="number" min="0" step="0.01"
+                            className="form-control"
+                            style={{ width: 100 }}
+                            value={item.rate}
+                            onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
+                          <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                        <div style={{ gridColumn: '1 / -1', background: 'var(--blue-pale)', borderRadius: 8, padding: '8px 12px', fontSize: 13, color: 'var(--blue)', fontWeight: 600 }}>
+                          Subtotal: {item.people} people × {item.quantity} session(s) × {formatCAD(item.rate)} = {formatCAD((item.people || 1) * (item.quantity || 1) * (item.rate || 0))}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="line-item-qty">
+                          <label className="form-label">Qty / Hrs</label>
+                          <input
+                            type="number" min="0.5" step="0.5"
+                            className="form-control"
+                            style={{ width: 72 }}
+                            value={item.quantity}
+                            onChange={e => updateLine(idx, 'quantity', parseFloat(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div className="line-item-rate">
+                          <label className="form-label">Rate (CAD)</label>
+                          <input
+                            type="number" min="0" step="0.01"
+                            className="form-control"
+                            style={{ width: 100 }}
+                            value={item.rate}
+                            onChange={e => updateLine(idx, 'rate', parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: 2 }}>
+                          <button type="button" className="btn btn-danger btn-icon btn-sm" onClick={() => removeLine(idx)} disabled={lineItems.length === 1}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
@@ -285,7 +375,6 @@ export default function InvoiceForm() {
                 )}
               </div>
 
-              {/* GST toggle */}
               <div className="toggle-row" style={{ marginBottom: 20 }}>
                 <label className="toggle">
                   <input type="checkbox" checked={gstEnabled} onChange={e => setGstEnabled(e.target.checked)} />
@@ -294,7 +383,6 @@ export default function InvoiceForm() {
                 <span><strong>Include GST (5%)</strong> — Currently not collected. Enable only when registered.</span>
               </div>
 
-              {/* Totals summary */}
               <div style={{ maxWidth: 300, marginLeft: 'auto' }}>
                 <div className="totals-row"><span>Subtotal</span><span>{formatCAD(totals.subtotal)}</span></div>
                 {totals.discountAmount > 0 && (

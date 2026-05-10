@@ -20,7 +20,7 @@ export default function Dashboard() {
     setLoading(true)
     const { data, error } = await supabase
       .from('invoices')
-      .select('id, invoice_number, client_name, service_date, total, status, created_at')
+      .select('id, invoice_number, client_name, service_date, total, status, emailed_at, created_at')
       .order('created_at', { ascending: false })
     if (!error) setInvoices(data || [])
     setLoading(false)
@@ -32,7 +32,7 @@ export default function Dashboard() {
   )
 
   const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
-  const outstanding = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
+  const outstanding  = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
 
   return (
     <div className="app-layout">
@@ -45,7 +45,6 @@ export default function Dashboard() {
           <StatCard label="Outstanding" value={formatCAD(outstanding)} warn={outstanding > 0} />
         </div>
 
-        {/* Header */}
         <div className="page-header">
           <h1>Invoices</h1>
           <Link to="/invoice/new" className="btn btn-primary">
@@ -54,7 +53,6 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* Search */}
         <div className="form-group" style={{ marginBottom: 16 }}>
           <input
             type="search"
@@ -65,7 +63,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* List */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>Loading invoices…</div>
         ) : filtered.length === 0 ? (
@@ -78,15 +75,24 @@ export default function Dashboard() {
         ) : (
           <div className="invoice-list">
             {filtered.map(inv => (
-              <div
-                key={inv.id}
-                className="invoice-row"
-                onClick={() => navigate(`/invoice/${inv.id}`)}
-              >
+              <div key={inv.id} className="invoice-row" onClick={() => navigate(`/invoice/${inv.id}`)}>
                 <span className="invoice-number">{inv.invoice_number}</span>
                 <div>
                   <div className="invoice-client">{inv.client_name}</div>
-                  <div className="invoice-date">{formatDateShort(inv.service_date)}</div>
+                  <div className="invoice-date" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {formatDateShort(inv.service_date)}
+                    {inv.emailed_at ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Emailed
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Not emailed
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className={`badge badge-${inv.status || 'draft'}`}>
                   {STATUS_COLORS[inv.status]?.label || 'Draft'}
