@@ -4,17 +4,16 @@ export function generateInvoiceNumber(existingNumbers = []) {
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const prefix = `AWR-${year}${month}-`
-
   const existing = existingNumbers
     .filter(n => n && n.startsWith(prefix))
     .map(n => parseInt(n.replace(prefix, '')) || 0)
-
   const next = existing.length > 0 ? Math.max(...existing) + 1 : 1
   return `${prefix}${String(next).padStart(3, '0')}`
 }
 
 // Calculate invoice totals — handles group workshop (people × sessions × rate)
-export function calculateTotals(lineItems, discountType, discountValue, gstEnabled) {
+// Province-aware tax rate
+export function calculateTotals(lineItems, discountType, discountValue, gstEnabled, province) {
   const subtotal = lineItems.reduce((sum, item) => {
     const people = item.service_id === 'group-workshop' ? (parseFloat(item.people) || 1) : 1
     return sum + (people * parseFloat(item.quantity || 1) * parseFloat(item.rate || 0))
@@ -28,16 +27,32 @@ export function calculateTotals(lineItems, discountType, discountValue, gstEnabl
   }
 
   const afterDiscount = Math.max(0, subtotal - discountAmount)
-  const gstAmount = gstEnabled ? afterDiscount * 0.05 : 0
+  const taxRate = gstEnabled ? getProvinceTaxRate(province) / 100 : 0
+  const gstAmount = afterDiscount * taxRate
   const total = afterDiscount + gstAmount
 
   return {
-    subtotal: round2(subtotal),
+    subtotal:       round2(subtotal),
     discountAmount: round2(discountAmount),
-    afterDiscount: round2(afterDiscount),
-    gstAmount: round2(gstAmount),
-    total: round2(total),
+    afterDiscount:  round2(afterDiscount),
+    gstAmount:      round2(gstAmount),
+    total:          round2(total),
   }
+}
+
+export function getProvinceTaxRate(province) {
+  const p = (province || '').toUpperCase()
+  if (p === 'ON') return 13
+  if (['NB', 'NS', 'NL', 'PE'].includes(p)) return 15
+  if (p === 'QC') return 14.975
+  return 5 // Default GST only
+}
+
+export function getProvinceTaxLabel(province) {
+  const p = (province || '').toUpperCase()
+  if (['ON', 'NB', 'NS', 'NL', 'PE'].includes(p)) return 'HST'
+  if (p === 'QC') return 'GST + QST'
+  return 'GST'
 }
 
 export function round2(n) {
@@ -66,6 +81,20 @@ export function formatDateShort(dateStr) {
 
 export const STATUS_COLORS = {
   draft: { bg: '#f1f5f9', text: '#64748b', label: 'Draft' },
-  sent: { bg: '#dbeafe', text: '#1d4ed8', label: 'Sent' },
-  paid: { bg: '#dcfce7', text: '#15803d', label: 'Paid' },
+  sent:  { bg: '#dbeafe', text: '#1d4ed8', label: 'Sent' },
+  paid:  { bg: '#dcfce7', text: '#15803d', label: 'Paid' },
 }
+
+export const CANADIAN_PROVINCES = [
+  { code: '', label: '— Select Province —' },
+  { code: 'AB', label: 'Alberta (GST 5%)' },
+  { code: 'BC', label: 'British Columbia (GST 5%)' },
+  { code: 'MB', label: 'Manitoba (GST 5%)' },
+  { code: 'NB', label: 'New Brunswick (HST 15%)' },
+  { code: 'NL', label: 'Newfoundland (HST 15%)' },
+  { code: 'NS', label: 'Nova Scotia (HST 15%)' },
+  { code: 'ON', label: 'Ontario (HST 13%)' },
+  { code: 'PE', label: 'Prince Edward Island (HST 15%)' },
+  { code: 'QC', label: 'Quebec (GST+QST 14.975%)' },
+  { code: 'SK', label: 'Saskatchewan (GST 5%)' },
+]
