@@ -15,11 +15,6 @@ const EMPTY_LINE = () => ({
   rate: 0,
 })
 
-/**
- * FIXED: NumInput
- * Uses onFocus select() and specific inputMode to make 
- * replacing the default "1" much easier on mobile and desktop.
- */
 function NumInput({ value, onChange, min = '0', step = '1', style = {}, label }) {
   return (
     <div className="form-group" style={{ marginBottom: 0 }}>
@@ -33,7 +28,7 @@ function NumInput({ value, onChange, min = '0', step = '1', style = {}, label })
         style={{ ...style, height: '38px' }}
         value={value}
         onChange={onChange}
-        onFocus={(e) => e.target.select()} // Automatically highlights the "1" so typing replaces it
+        onFocus={(e) => e.target.select()} 
       />
     </div>
   )
@@ -138,7 +133,6 @@ export default function InvoiceForm() {
   }
 
   function updateLine(idx, field, value) {
-    // If value is empty string (user cleared input), default to 0 for numbers
     const finalValue = (field === 'quantity' || field === 'people' || field === 'rate') && value === '' ? 0 : value
     setLineItems(prev => prev.map((item, i) => i !== idx ? item : { ...item, [field]: finalValue }))
   }
@@ -359,22 +353,60 @@ export default function InvoiceForm() {
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="card-header"><h2>Tax & Totals</h2></div>
             <div className="card-body">
-              <div className="toggle-row" style={{ marginBottom: 20 }}>
-                <label className="toggle">
-                  <input type="checkbox" checked={gstEnabled} onChange={e => setGstEnabled(e.target.checked)} />
-                  <span className="toggle-slider" />
-                </label>
-                <span>
-                  <strong>Include {taxLabel} {province ? `(${taxRate}%)` : ''}</strong>
-                </span>
-              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+                <div>
+                  <div className="form-group">
+                    <label className="form-label">Rebate / Discount</label>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <select className="form-control" style={{ width: '110px' }} value={discountType} onChange={e => setDiscountType(e.target.value)}>
+                        <option value="none">None</option>
+                        <option value="amount">$ Fixed</option>
+                        <option value="percent">% Percent</option>
+                      </select>
+                      {discountType !== 'none' && (
+                        <NumInput 
+                          value={discountValue} 
+                          step="0.01"
+                          onChange={e => setDiscountValue(e.target.value)} 
+                          style={{ width: '100px' }}
+                        />
+                      )}
+                    </div>
+                  </div>
 
-              <div style={{ maxWidth: 300, marginLeft: 'auto' }}>
-                <div className="totals-row"><span>Subtotal</span><span>{formatCAD(totals.subtotal)}</span></div>
-                {gstEnabled && (
-                  <div className="totals-row"><span>{taxLabel}</span><span>{formatCAD(totals.gstAmount)}</span></div>
-                )}
-                <div className="totals-row total"><span>Total (CAD)</span><span>{formatCAD(totals.total)}</span></div>
+                  <div className="toggle-row" style={{ marginTop: 20 }}>
+                    <label className="toggle">
+                      <input type="checkbox" checked={gstEnabled} onChange={e => setGstEnabled(e.target.checked)} />
+                      <span className="toggle-slider" />
+                    </label>
+                    <span><strong>Include {taxLabel} {province ? `(${taxRate}%)` : ''}</strong></span>
+                  </div>
+                </div>
+
+                <div style={{ minWidth: 200 }}>
+                  <div className="totals-row"><span>Subtotal</span><span>{formatCAD(totals.subtotal)}</span></div>
+                  {totals.discountAmount > 0 && (
+                    <div className="totals-row" style={{ color: 'var(--success)' }}>
+                      <span>Rebate</span>
+                      <span>-{formatCAD(totals.discountAmount)}</span>
+                    </div>
+                  )}
+                  {gstEnabled && (
+                    <div className="totals-row"><span>{taxLabel}</span><span>{formatCAD(totals.gstAmount)}</span></div>
+                  )}
+                  <div className="totals-row total"><span>Total (CAD)</span><span>{formatCAD(totals.total)}</span></div>
+                </div>
+              </div>
+              
+              <div className="form-group" style={{ marginTop: 20 }}>
+                <label className="form-label">Notes (shown on invoice)</label>
+                <textarea 
+                  className="form-control" 
+                  style={{ height: '80px', resize: 'vertical' }}
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="e.g. Referral discount applied. Thanks for your business!"
+                />
               </div>
             </div>
           </div>
