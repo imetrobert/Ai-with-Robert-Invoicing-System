@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { generateInvoicePDF, generateInvoicePDFBase64 } from '../lib/pdfGenerator'
+import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
 import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate } from '../lib/invoiceUtils'
 
@@ -38,11 +38,6 @@ export default function InvoiceView() {
     setPdfLoading(false)
   }
 
-  /**
-   * FIXED: Added 'await' to generateInvoicePDFBase64.
-   * This prevents the "e.split is not a function" error by ensuring
-   * we pass a string to EmailJS instead of a Promise.
-   */
   async function handleEmail() {
     if (!invoice.client_email) {
       setEmailMsg({ type: 'error', text: 'No client email address on this invoice. Edit the invoice to add one first.' })
@@ -51,17 +46,12 @@ export default function InvoiceView() {
     setEmailLoading(true)
     setEmailMsg(null)
     try {
-      // THE FIX: Added 'await' here
-      const base64 = await generateInvoicePDFBase64(invoice) 
-      
-      await sendInvoiceEmail(invoice, base64)
-      
+      await sendInvoiceEmail(invoice)
       const now = new Date().toISOString()
       await supabase.from('invoices').update({ emailed_at: now }).eq('id', id)
       setInvoice(prev => ({ ...prev, emailed_at: now }))
       setEmailMsg({ type: 'success', text: `Invoice emailed successfully to ${invoice.client_email}!` })
     } catch (e) {
-      console.error("Email error detail:", e)
       setEmailMsg({ type: 'error', text: 'Email failed: ' + e.message })
     }
     setEmailLoading(false)
@@ -90,8 +80,6 @@ export default function InvoiceView() {
 
   const sc = STATUS_COLORS[invoice.status] || STATUS_COLORS.draft
   const services = Array.isArray(invoice.services) ? invoice.services : []
-  
-  // Tax labels updated for QC/ON/Other provinces
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate = getProvinceTaxRate(invoice.province)
 
@@ -162,6 +150,7 @@ export default function InvoiceView() {
               <div style={{ textAlign: 'right' }}>
                 <MetaRow label="Date of Service" value={formatDate(invoice.service_date)} />
                 <MetaRow label="Date Issued" value={formatDate(invoice.created_at?.split('T')[0])} />
+                {invoice.emailed_at && <MetaRow label="Emailed" value={formatDate(invoice.emailed_at?.split('T')[0])} />}
               </div>
             </div>
 
