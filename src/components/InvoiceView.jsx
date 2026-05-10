@@ -52,7 +52,9 @@ export default function InvoiceView() {
       setInvoice(prev => ({ ...prev, emailed_at: now }))
       setEmailMsg({ type: 'success', text: `Invoice emailed successfully to ${invoice.client_email}!` })
     } catch (e) {
-      setEmailMsg({ type: 'error', text: 'Email failed: ' + e.message })
+      // EmailJS errors use e.text, standard errors use e.message
+      const msg = e?.text || e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || 'Unknown error'
+      setEmailMsg({ type: 'error', text: 'Email failed: ' + msg })
     }
     setEmailLoading(false)
   }
