@@ -146,7 +146,9 @@ export async function sendInvoiceEmail(invoice) {
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#2563eb;font-weight:700;margin-bottom:8px;">Bill To</div>
                 <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:4px;">${invoice.client_name}</div>
                 ${invoice.client_email ? `<div style="color:#64748b;font-size:13px;">${invoice.client_email}</div>` : ''}
-                ${invoice.province ? `<div style="color:#64748b;font-size:13px;">${invoice.province}</div>` : ''}
+                ${invoice.address_line1 ? `<div style="color:#64748b;font-size:13px;margin-top:4px;">${invoice.address_line1}</div>` : ''}
+                ${invoice.address_line2 ? `<div style="color:#64748b;font-size:13px;">${invoice.address_line2}</div>` : ''}
+                ${(invoice.address_city || invoice.province || invoice.address_postal) ? `<div style="color:#64748b;font-size:13px;">${[invoice.address_city, invoice.province, invoice.address_postal].filter(Boolean).join(', ')}</div>` : ''}
               </td>
               <td style="vertical-align:top;text-align:right;">
                 <table cellpadding="3" cellspacing="0" style="margin-left:auto;">
