@@ -103,6 +103,8 @@ export async function sendInvoiceEmail(invoice) {
       ${statusBanner}
     </div>`
 
+  const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
+
   // Full HTML email — this IS the invoice, beautifully formatted
   const html_body = `<!DOCTYPE html>
 <html>
@@ -223,8 +225,6 @@ export async function sendInvoiceEmail(invoice) {
 </table>
 </body>
 </html>`
-
-  const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
   const templateParams = {
     to_email:       invoice.client_email,
