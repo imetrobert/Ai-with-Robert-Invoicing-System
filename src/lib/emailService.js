@@ -90,7 +90,7 @@ export async function sendInvoiceEmail(invoice) {
     : `<div style="margin:0 0 24px;padding:20px 28px;background:#fef9c3;border-radius:8px;text-align:center;border:1px solid #fde68a;">
         <div style="color:#92400e;font-size:22px;font-weight:800;letter-spacing:1px;">⏳ AMOUNT PENDING</div>
         <div style="color:#78350f;font-size:20px;font-weight:700;margin-top:8px;">${formatCAD(invoice.total || 0)}</div>
-        <div style="color:#92400e;font-size:13px;margin-top:4px;">Please arrange payment at your earliest convenience — ${serviceYear}</div>
+        <div style="color:#92400e;font-size:13px;margin-top:4px;">Please arrange payment at your earliest convenience.</div>
       </div>`
 
   const greeting = `
@@ -199,8 +199,8 @@ export async function sendInvoiceEmail(invoice) {
       <tr>
         <td style="background:#153457;padding:16px 28px;text-align:center;margin-top:8px;">
           <div style="color:rgba(180,200,240,0.9);font-size:12px;margin-bottom:4px;">Thank you for choosing AI with Robert!</div>
-          <div style="color:rgba(150,170,210,0.8);font-size:11px;">aiwithrobert.com &nbsp;&middot;&nbsp; invoices@aiwithrobert.com &nbsp;&middot;&nbsp; 514-250-8491</div>
-          <div style="color:rgba(150,170,210,0.7);font-size:10px;margin-top:4px;">${taxFooter}</div>
+          <div style="color:rgba(255,255,255,0.85);font-size:11px;">aiwithrobert.com &nbsp;&middot;&nbsp; invoices@aiwithrobert.com &nbsp;&middot;&nbsp; 514-250-8491</div>
+          <div style="color:rgba(255,255,255,0.65);font-size:10px;margin-top:4px;">${taxFooter}</div>
         </td>
       </tr>
 
