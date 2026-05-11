@@ -299,3 +299,59 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 
 /* ── Status bar ── */
 .status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; }
+
+/* ── Form totals (live tally in Discount & Totals card) ── */
+.form-totals {
+  margin-top: 16px;
+  border-top: 2px solid var(--border);
+  padding-top: 12px;
+}
+.form-totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 15px;
+  border-bottom: 1px solid var(--border);
+}
+.form-totals-row:last-child { border-bottom: none; }
+.form-totals-row.discount { color: var(--success); }
+.form-totals-row.total {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--navy);
+  border-bottom: none;
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+/* ── Sticky total bar at bottom of form ── */
+.sticky-totals {
+  position: sticky;
+  bottom: 0;
+  background: var(--navy);
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 -4px 16px rgba(21,52,87,.2);
+  z-index: 50;
+  margin: 0 -16px;
+}
+.sticky-totals-label {
+  font-size: 12px;
+  opacity: .7;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.sticky-totals-breakdown {
+  font-size: 11px;
+  opacity: .6;
+  margin-top: 2px;
+}
+.sticky-totals-amount {
+  font-size: 22px;
+  font-weight: 800;
+  font-family: monospace;
+}
