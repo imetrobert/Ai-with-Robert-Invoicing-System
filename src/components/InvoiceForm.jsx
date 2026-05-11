@@ -41,6 +41,10 @@ export default function InvoiceForm() {
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [province, setProvince] = useState('')
+  const [addressLine1, setAddressLine1] = useState('')
+  const [addressLine2, setAddressLine2] = useState('')
+  const [addressCity, setAddressCity] = useState('')
+  const [addressPostal, setAddressPostal] = useState('')
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0])
   const [lineItems, setLineItems] = useState([EMPTY_LINE()])
   const [discountType, setDiscountType] = useState('none')
@@ -77,6 +81,10 @@ export default function InvoiceForm() {
     setClientName(data.client_name)
     setClientEmail(data.client_email || '')
     setProvince(data.province || '')
+    setAddressLine1(data.address_line1 || '')
+    setAddressLine2(data.address_line2 || '')
+    setAddressCity(data.address_city || '')
+    setAddressPostal(data.address_postal || '')
     setServiceDate(data.service_date)
     setLineItems(data.services?.length
       ? data.services.map(s => ({ ...s, _id: Math.random().toString(36).slice(2), people: s.people || 1 }))
@@ -208,10 +216,33 @@ export default function InvoiceForm() {
                 <label className="form-label">Client Email</label>
                 <input type="email" className="form-control" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="client@email.com" />
               </div>
-              <div className="form-row">
+              <div className="form-group" style={{ maxWidth: 240 }}>
+                <label className="form-label">Date of Service <span className="required">*</span></label>
+                <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
+              </div>
+
+              {/* Optional address section */}
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
+                  Client Address <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', fontSize: 12 }}>(optional)</span>
+                </div>
                 <div className="form-group">
-                  <label className="form-label">Date of Service <span className="required">*</span></label>
-                  <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
+                  <label className="form-label">Street Address</label>
+                  <input className="form-control" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="123 Main Street" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Apt / Suite / Unit</label>
+                  <input className="form-control" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 4B" />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">City</label>
+                    <input className="form-control" value={addressCity} onChange={e => setAddressCity(e.target.value)} placeholder="Montreal" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Postal Code</label>
+                    <input className="form-control" value={addressPostal} onChange={e => setAddressPostal(e.target.value.toUpperCase())} placeholder="H3Z 2Y7" maxLength={7} />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Province</label>
