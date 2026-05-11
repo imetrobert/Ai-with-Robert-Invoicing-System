@@ -12,6 +12,15 @@ export default function InvoicePublic() {
   const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
+    // Prevent search engines from indexing public invoice pages
+    const meta = document.createElement('meta')
+    meta.name = 'robots'
+    meta.content = 'noindex, nofollow'
+    document.head.appendChild(meta)
+    return () => document.head.removeChild(meta)
+  }, [])
+
+  useEffect(() => {
     fetchAndTrack()
   }, [token])
 
