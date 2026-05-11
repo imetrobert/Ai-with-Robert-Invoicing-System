@@ -265,4 +265,12 @@ export async function sendInvoiceEmail(invoice) {
   }
 
   return emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
+    .catch(err => {
+      // Detect quota exceeded error from EmailJS
+      const msg = err?.text || err?.message || ''
+      if (msg.includes('quota') || msg.includes('limit') || msg.includes('429') || msg.includes('blocked')) {
+        throw new Error('EmailJS monthly limit reached (200/200). Upgrade at emailjs.com or wait until your cycle resets on the 10th.')
+      }
+      throw err
+    })
 }
