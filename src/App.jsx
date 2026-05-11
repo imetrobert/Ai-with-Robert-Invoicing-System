@@ -5,6 +5,7 @@ import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceView from './components/InvoiceView'
+import InvoicePublic from './components/InvoicePublic'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="/invoice/new" element={session ? <InvoiceForm /> : <Navigate to="/login" replace />} />
         <Route path="/invoice/:id" element={session ? <InvoiceView /> : <Navigate to="/login" replace />} />
         <Route path="/invoice/:id/edit" element={session ? <InvoiceForm /> : <Navigate to="/login" replace />} />
+        <Route path="/invoice/public/:token" element={<InvoicePublic />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
