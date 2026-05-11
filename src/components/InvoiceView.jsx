@@ -101,6 +101,12 @@ export default function InvoiceView() {
               Emailed {formatDateShort(invoice.emailed_at?.split('T')[0])}
             </span>
           )}
+          {invoice.view_count > 0 && (
+            <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>
+              👁 {invoice.view_count} view{invoice.view_count !== 1 ? 's' : ''}
+              {invoice.first_viewed_at ? ` · first opened ${formatDateShort(invoice.first_viewed_at?.split('T')[0])}` : ''}
+            </span>
+          )}
         </div>
 
         {/* Action buttons — full width on mobile */}
