@@ -34,6 +34,18 @@ export default function Dashboard() {
   const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const outstanding  = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
 
+  // EmailJS quota — cycle starts on the 10th of each month
+  const emailsUsed = (() => {
+    const now = new Date()
+    const cycleStart = new Date(now.getFullYear(), now.getMonth(), 10)
+    if (now < cycleStart) cycleStart.setMonth(cycleStart.getMonth() - 1)
+    return invoices.filter(i => i.emailed_at && new Date(i.emailed_at) >= cycleStart).length
+  })()
+  const EMAIL_LIMIT = 200
+  const emailsLeft = EMAIL_LIMIT - emailsUsed
+  const emailPct = (emailsUsed / EMAIL_LIMIT) * 100
+  const emailColor = emailPct >= 95 ? 'var(--danger)' : emailPct >= 80 ? '#d97706' : 'var(--success)'
+
   return (
     <div className="app-layout">
       <Navbar session={session} />
@@ -42,6 +54,28 @@ export default function Dashboard() {
           <StatCard label="Invoices" value={invoices.length} />
           <StatCard label="Collected" value={formatCAD(totalRevenue)} accent />
           <StatCard label="Outstanding" value={formatCAD(outstanding)} warn={outstanding > 0} />
+        </div>
+
+        {/* EmailJS quota bar */}
+        <div className="card" style={{ padding: '12px 16px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
+              📧 EmailJS quota this cycle
+            </span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: emailColor }}>
+              {emailsUsed} / {EMAIL_LIMIT} &nbsp;·&nbsp; {emailsLeft} left
+            </span>
+          </div>
+          <div style={{ height: 6, background: 'var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${Math.min(emailPct, 100)}%`, background: emailColor, borderRadius: 999, transition: 'width .4s' }} />
+          </div>
+          {emailsLeft <= 10 && (
+            <div style={{ marginTop: 6, fontSize: 11, color: emailColor, fontWeight: 600 }}>
+              {emailsLeft === 0
+                ? 'Quota reached — emails will fail until cycle resets on the 10th.'
+                : `Only ${emailsLeft} email${emailsLeft === 1 ? '' : 's'} left this cycle — resets on the 10th.`}
+            </div>
+          )}
         </div>
 
         <div className="page-header">
