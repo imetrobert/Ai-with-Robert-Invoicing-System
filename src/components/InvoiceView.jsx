@@ -18,6 +18,7 @@ export default function InvoiceView() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
+  const [showResendModal, setShowResendModal] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -62,6 +63,10 @@ export default function InvoiceView() {
     await supabase.from('invoices').update({ status: newStatus }).eq('id', id)
     setInvoice(prev => ({ ...prev, status: newStatus }))
     setStatusSaving(false)
+    // Offer to resend confirmation email when marking as paid
+    if (newStatus === 'paid' && invoice.client_email) {
+      setShowResendModal(true)
+    }
   }
 
   async function handleDelete() {
@@ -241,6 +246,40 @@ export default function InvoiceView() {
           </div>
         </div>
       </div>
+
+      {/* Resend confirmation modal */}
+      {showResendModal && (
+        <div className="modal-overlay" onClick={() => setShowResendModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Send Payment Confirmation?</h3>
+            <p>
+              Would you like to send <strong>{invoice.client_name}</strong> a payment confirmation email showing their invoice as <strong>PAID</strong>?
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setShowResendModal(false)}>No thanks</button>
+              <button className="btn btn-primary" onClick={async () => {
+                setShowResendModal(false)
+                setEmailLoading(true)
+                setEmailMsg(null)
+                try {
+                  // Use updated invoice with paid status
+                  await sendInvoiceEmail({ ...invoice, status: 'paid' })
+                  const now = new Date().toISOString()
+                  await supabase.from('invoices').update({ emailed_at: now }).eq('id', id)
+                  setInvoice(prev => ({ ...prev, emailed_at: now }))
+                  setEmailMsg({ type: 'success', text: `Payment confirmation sent to ${invoice.client_email}!` })
+                } catch (e) {
+                  const msg = e?.text || e?.message || 'Unknown error'
+                  setEmailMsg({ type: 'error', text: 'Email failed: ' + msg })
+                }
+                setEmailLoading(false)
+              }}>
+                Yes, Send Confirmation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showDeleteModal && (
         <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
