@@ -197,6 +197,18 @@ export async function sendInvoiceEmail(invoice) {
       <!-- Notes -->
       ${notesSection ? `<tr><td style="padding:0 28px 8px;">${notesSection}</td></tr>` : ''}
 
+      <!-- PDF Download Link -->
+      <tr>
+        <td style="padding:16px 28px 0;">
+          <div style="text-align:center;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+            <p style="margin:0;color:#64748b;font-size:14px;">
+              You can also
+              <a href="${publicUrl}" style="color:#2563eb;font-weight:600;text-decoration:none;">download a PDF copy of your invoice</a>.
+            </p>
+          </div>
+        </td>
+      </tr>
+
       <!-- Footer -->
       <tr>
         <td style="background:#153457;padding:16px 28px;text-align:center;margin-top:8px;">
@@ -211,6 +223,8 @@ export async function sendInvoiceEmail(invoice) {
 </table>
 </body>
 </html>`
+
+  const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
   const templateParams = {
     to_email:       invoice.client_email,
