@@ -199,6 +199,28 @@ export async function sendInvoiceEmail(invoice) {
       <!-- Notes -->
       ${notesSection ? `<tr><td style="padding:0 28px 8px;">${notesSection}</td></tr>` : ''}
 
+      <!-- Payment Instructions (unpaid only) -->
+      ${!isPaid ? `
+      <tr>
+        <td style="padding:16px 28px 0;">
+          <div style="padding:16px 18px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+              <span style="background:#FFD100;color:#1a1a1a;font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:0.5px;font-family:Arial,sans-serif;">e&#8209;Transfer</span>
+              <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#1d4ed8;font-weight:700;">How to Pay</div>
+            </div>
+            <p style="margin:0 0 8px;color:#1e3a5f;font-size:14px;line-height:1.6;">
+              <strong>Interac e-Transfer</strong> — Send your payment to
+              <span style="font-family:monospace;background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:13px;color:#1d4ed8;font-weight:600;">invoices@aiwithrobert.com</span>
+              and add this email as a payee in your Interac settings.
+            </p>
+            <p style="margin:0;color:#1e3a5f;font-size:14px;line-height:1.6;">
+              <strong>Cash payment</strong> — We can also arrange a cash payment at your convenience. Simply reply to this email to coordinate.
+            </p>
+          </div>
+        </td>
+      </tr>
+      ` : ''}
+
       <!-- PDF Download Link -->
       <tr>
         <td style="padding:16px 28px 0;">
