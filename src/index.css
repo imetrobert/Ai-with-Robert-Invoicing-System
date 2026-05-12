@@ -30,7 +30,6 @@ html, body, #root {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  /* Prevent horizontal scroll on mobile */
   overflow-x: hidden;
 }
 
@@ -119,7 +118,7 @@ html, body, #root {
 .form-label .required { color: var(--blue); margin-left: 2px; }
 .form-control {
   width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
-  border-radius: 8px; font-family: inherit; font-size: 16px; /* 16px prevents iOS zoom */
+  border-radius: 8px; font-family: inherit; font-size: 16px;
   color: var(--text); background: white; transition: border-color .15s;
   appearance: none; -webkit-appearance: none;
 }
@@ -128,7 +127,6 @@ html, body, #root {
 select.form-control { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 
-/* Responsive 2-col grid — stacks on mobile */
 .form-row { display: grid; grid-template-columns: 1fr; gap: 0; }
 @media (min-width: 520px) { .form-row { grid-template-columns: 1fr 1fr; gap: 14px; } }
 
@@ -148,20 +146,38 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 
 /* ── Invoice list ── */
 .invoice-list { display: flex; flex-direction: column; gap: 8px; }
+
 .invoice-row {
-  display: grid; grid-template-columns: 1fr auto;
-  gap: 8px; align-items: center;
-  padding: 12px 14px; background: white;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  cursor: pointer; transition: all .15s;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all .15s;
 }
 .invoice-row:hover { border-color: var(--blue); box-shadow: 0 2px 10px rgba(37,99,235,.1); }
-.invoice-row-left { min-width: 0; }
+
+.invoice-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+.invoice-row-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
 .invoice-number { font-weight: 700; font-size: 12px; color: var(--blue); font-family: monospace; }
 .invoice-client { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .invoice-date { font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.invoice-right { text-align: right; flex-shrink: 0; }
-.invoice-amount { font-weight: 700; font-size: 15px; color: var(--navy); }
+.invoice-amount { font-weight: 700; font-size: 15px; color: var(--navy); flex-shrink: 0; }
 
 /* ── Status badge ── */
 .badge {
@@ -172,10 +188,9 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .badge-sent  { background: var(--blue-pale); color: var(--blue); }
 .badge-paid  { background: var(--success-bg); color: var(--success); }
 
-/* ── Invoice view — mobile first ── */
+/* ── Invoice view ── */
 .invoice-view { max-width: 720px; }
 
-/* Page header — wraps on mobile */
 .page-header {
   display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;
 }
@@ -186,7 +201,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 }
 .page-header h1 { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--navy); }
 
-/* ── Totals — full width on mobile, no horizontal scroll ── */
+/* ── Totals ── */
 .invoice-totals-section {
   display: flex; flex-direction: column; gap: 16px;
 }
@@ -208,7 +223,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   border-bottom: none; padding-top: 12px;
 }
 
-/* ── Services table — scrollable on mobile ── */
+/* ── Services table ── */
 .table-scroll-wrapper {
   width: 100%;
   overflow-x: auto;
@@ -216,6 +231,11 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   border-radius: 8px;
   border: 1px solid var(--border);
   margin-bottom: 16px;
+}
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
 .data-table th {
@@ -237,7 +257,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   .tax-totals-right { min-width: 200px; }
 }
 
-/* ── Bill to grid on invoice view ── */
+/* ── Bill to grid ── */
 .bill-to-grid {
   display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;
 }
@@ -260,7 +280,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .alert-success { background: var(--success-bg); color: var(--success); border: 1px solid #86efac; }
 .alert-error   { background: var(--danger-bg); color: var(--danger); border: 1px solid #fca5a5; }
 
-/* ── Confirm dialog ── */
+/* ── Modal ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 200; display: flex; align-items: flex-end; justify-content: center; padding: 0; }
 @media (min-width: 480px) { .modal-overlay { align-items: center; padding: 20px; } }
 .modal {
@@ -300,7 +320,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 /* ── Status bar ── */
 .status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; }
 
-/* ── Form totals (live tally in Discount & Totals card) ── */
+/* ── Form totals ── */
 .form-totals {
   margin-top: 16px;
   border-top: 2px solid var(--border);
@@ -325,7 +345,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   margin-top: 4px;
 }
 
-/* ── Sticky total bar at bottom of form ── */
+/* ── Sticky total bar ── */
 .sticky-totals {
   position: sticky;
   bottom: 0;
@@ -354,4 +374,22 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   font-size: 22px;
   font-weight: 800;
   font-family: monospace;
+}
+
+/* ── Invoice actions bar ── */
+.invoice-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* ── Filter panel ── */
+.filter-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  margin-bottom: 8px;
 }
