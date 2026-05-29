@@ -131,7 +131,7 @@ export async function extractSurveyFromFile(file, apiKey) {
       }],
       generationConfig: {
         temperature: 0.1,      // Low temp = more deterministic extraction
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
       }
     })
   })
