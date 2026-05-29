@@ -138,9 +138,10 @@ export async function extractSurveyFromFile(file, apiKey) {
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}))
-    const msg = err?.error?.message || response.statusText
-    if (response.status === 429) throw new Error('Gemini rate limit hit — wait a minute and try again')
-    if (response.status === 403) throw new Error('Invalid Gemini API key — check your key in Settings')
+    const msg = err?.error?.message || response.statusText || `HTTP ${response.status}`
+    if (response.status === 429) throw new Error(`Rate limit: ${msg}`)
+    if (response.status === 403) throw new Error(`API key rejected: ${msg}`)
+    if (response.status === 400) throw new Error(`Bad request: ${msg}`)
     throw new Error(`Gemini API error: ${msg}`)
   }
 
