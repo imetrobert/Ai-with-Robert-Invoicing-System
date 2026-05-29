@@ -153,12 +153,16 @@ export async function extractSurveyFromFile(file, apiKey) {
   const text = parts.find(p => p.text && !p.thought)?.text
     || parts.find(p => p.text)?.text
 
-  if (!text) throw new Error('Gemini returned an empty response — try again')
+  if (!text) {
+    console.error('Gemini raw response:', JSON.stringify(data, null, 2))
+    throw new Error('Gemini returned an empty response — try again')
+  }
+  console.log('Gemini raw text:', text)
 
   // Strip markdown fences and extract JSON object/array
   const stripped = text.replace(/```json|```/g, '').trim()
   const jsonMatch = stripped.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('No JSON found in Gemini response — try again')
+  if (!jsonMatch) throw new Error('RAW RESPONSE: ' + stripped.substring(0, 500))
 
   try {
     return JSON.parse(jsonMatch[0])
