@@ -216,7 +216,7 @@ export async function extractSurveyFromFile(file, apiKey) {
     }
   }
 
-  // If Gemini returned an array, unwrap the first element
-  if (Array.isArray(parsed)) return parsed[0]
-  return parsed
+  // Always return an array of surveys
+  if (Array.isArray(parsed)) return parsed
+  return [parsed]
 }
