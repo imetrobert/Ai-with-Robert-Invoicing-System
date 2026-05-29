@@ -40,7 +40,10 @@ export default function InvoicePublic() {
 
   async function handlePDF() {
     setPdfLoading(true)
-    try { await generateInvoicePDF(invoice) }
+    try {
+      await generateInvoicePDF(invoice)
+      await supabase.rpc('increment_invoice_pdf_download', { token })
+    }
     catch (e) { alert('PDF generation failed: ' + e.message) }
     setPdfLoading(false)
   }

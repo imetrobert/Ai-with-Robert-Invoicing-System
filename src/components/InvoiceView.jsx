@@ -105,12 +105,13 @@ export default function InvoiceView() {
               Emailed {formatDateShort(utcToETDateStr(invoice.emailed_at))}
             </span>
           )}
-          {invoice.view_count > 0 && (
-            <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>
-              👁 {invoice.view_count} view{invoice.view_count !== 1 ? 's' : ''}
-              {invoice.first_viewed_at ? ` · first opened ${formatDateShort(utcToETDateStr(invoice.first_viewed_at))}` : ''}
-            </span>
-          )}
+          <span style={{ fontSize: 12, color: (invoice.view_count || 0) > 0 ? 'var(--blue)' : 'var(--muted)', fontWeight: 600 }}>
+            👁 {invoice.view_count || 0} view{invoice.view_count !== 1 ? 's' : ''}
+            {invoice.first_viewed_at ? ` · first opened ${formatDateShort(utcToETDateStr(invoice.first_viewed_at))}` : ''}
+          </span>
+          <span style={{ fontSize: 12, color: (invoice.pdf_download_count || 0) > 0 ? 'var(--blue)' : 'var(--muted)', fontWeight: 600 }}>
+            ⬇ {invoice.pdf_download_count || 0} PDF download{invoice.pdf_download_count !== 1 ? 's' : ''}
+          </span>
         </div>
 
         {/* Action buttons */}
