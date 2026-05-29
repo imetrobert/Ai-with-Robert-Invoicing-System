@@ -155,21 +155,25 @@ export async function extractSurveyFromFile(file, apiKey) {
     .map(p => p.text)
     .join('') || parts.filter(p => p.text).map(p => p.text).join('')
 
-  if (!text) {
-    console.error('Gemini raw response:', JSON.stringify(data, null, 2))
-    throw new Error('Gemini returned an empty response — try again')
+  // Show exactly what we got for debugging
+  const debugInfo = 'parts:' + parts.length + ' types:' + parts.map(p => p.thought ? 'thought' : 'text(' + (p.text||'').length + ')').join(',')
+
+  if (!text || text.trim() === '') {
+    throw new Error('Empty text. ' + debugInfo + ' raw:' + JSON.stringify(data).substring(0, 300))
   }
-  console.log('Gemini raw text:', text)
 
   // Strip markdown fences
   let stripped = text.replace(/```json|```/g, '').trim()
+
+  // Show length in all errors
+  const rawPreview = 'len=' + stripped.length + ' ' + stripped.substring(0, 200)
 
   // Find the first { and last } to extract the JSON object
   const firstBrace = stripped.indexOf('{')
   const lastBrace = stripped.lastIndexOf('}')
 
   if (firstBrace === -1) {
-    throw new Error('No JSON found — raw: ' + stripped.substring(0, 400))
+    throw new Error('No JSON found. ' + rawPreview)
   }
 
   // Try progressively from lastBrace backwards until we get valid JSON
