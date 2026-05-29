@@ -168,21 +168,39 @@ export async function extractSurveyFromFile(file, apiKey) {
   const firstBrace = stripped.indexOf('{')
   const lastBrace = stripped.lastIndexOf('}')
 
-  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    throw new Error('No JSON object found — raw: ' + stripped.substring(0, 300))
+  if (firstBrace === -1) {
+    throw new Error('No JSON found — raw: ' + stripped.substring(0, 400))
   }
 
-  const jsonStr = stripped.substring(firstBrace, lastBrace + 1)
-
-  try {
-    return JSON.parse(jsonStr)
-  } catch (parseErr) {
-    // Last resort: try to fix common JSON issues (trailing commas, etc)
+  // Try progressively from lastBrace backwards until we get valid JSON
+  // This handles cases where } appears inside string values
+  let parsed = null
+  let lastPos = stripped.length - 1
+  while (lastPos > firstBrace) {
+    const pos = stripped.lastIndexOf('}', lastPos)
+    if (pos <= firstBrace) break
     try {
-      const fixed = jsonStr.replace(/,\s*([}\]])/g, '$1')
-      return JSON.parse(fixed)
+      parsed = JSON.parse(stripped.substring(firstBrace, pos + 1))
+      break // success
     } catch {
-      throw new Error('JSON parse failed — raw: ' + stripped.substring(0, 300))
+      lastPos = pos - 1 // try the next } going backwards
     }
   }
+
+  if (!parsed) {
+    // Last resort: try fixing trailing commas and incomplete JSON
+    try {
+      // Add missing closing braces if truncated
+      let attempt = stripped.substring(firstBrace)
+      const opens = (attempt.match(/\{/g) || []).length
+      const closes = (attempt.match(/\}/g) || []).length
+      attempt += '}'.repeat(Math.max(0, opens - closes))
+      attempt = attempt.replace(/,\s*([}\]])/g, '$1') // remove trailing commas
+      parsed = JSON.parse(attempt)
+    } catch {
+      throw new Error('Could not parse JSON — raw (' + stripped.length + ' chars): ' + stripped.substring(0, 400))
+    }
+  }
+
+  return parsed
 }
