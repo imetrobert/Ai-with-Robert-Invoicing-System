@@ -14,7 +14,6 @@ const BRAND = {
 
 // ── Logo helpers ─────────────────────────────────────────────────────────────
 
-// Full quality logo for download PDF
 async function fetchLogoFull() {
   try {
     const res = await fetch('https://aiwithrobert.com/logo.PNG')
@@ -23,7 +22,6 @@ async function fetchLogoFull() {
   } catch (_) { return null }
 }
 
-// Compressed logo for email PDF — resized to 60x60px, JPEG quality 0.35 (~2KB)
 async function fetchLogoCompressed() {
   return new Promise((resolve) => {
     const img = new Image()
@@ -34,10 +32,8 @@ async function fetchLogoCompressed() {
         canvas.width = 60
         canvas.height = 60
         const ctx = canvas.getContext('2d')
-        // Fill white background (JPEG doesn't support transparency)
         ctx.fillStyle = '#153457'
         ctx.fillRect(0, 0, 60, 60)
-        // Draw logo scaled to fit
         const scale = Math.min(60 / img.width, 60 / img.height)
         const w = img.width * scale
         const h = img.height * scale
@@ -152,14 +148,20 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 56) {
   doc.setDrawColor(...BRAND.blue)
   doc.setLineWidth(0.4)
   doc.line(margin, billY + 1.5, margin + 40, billY + 1.5)
+
+  // ── Client name — wrap to avoid bleeding into the right meta column ──
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
   doc.setTextColor(...BRAND.dark)
-  doc.text(invoice.client_name || '', margin, billY + 9)
+  const maxNameWidth = col1 - margin - 8          // 8mm gap before meta column
+  const nameLines = doc.splitTextToSize(invoice.client_name || '', maxNameWidth)
+  doc.text(nameLines, margin, billY + 9)
+
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...BRAND.gray)
-  let addressY = billY + 16
+  let addressY = billY + 9 + (nameLines.length * 6)  // 6mm per wrapped line
+
   if (invoice.client_email) {
     doc.text(invoice.client_email, margin, addressY)
     addressY += 6
