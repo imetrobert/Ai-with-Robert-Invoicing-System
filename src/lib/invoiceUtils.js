@@ -11,6 +11,39 @@ export function generateInvoiceNumber(existingNumbers = []) {
   return `${prefix}${String(next).padStart(3, '0')}`
 }
 
+// ── Timezone-aware date helpers ───────────────────────────────────────────────
+
+const ET_LOCALE = 'en-CA'
+const ET_TZ     = 'America/Toronto'   // covers both EST and EDT automatically
+
+/**
+ * Convert a UTC ISO timestamp (e.g. Supabase created_at / emailed_at) to an
+ * Eastern date string in YYYY-MM-DD format so it never rolls back a day.
+ */
+export function utcToETDateStr(isoString) {
+  if (!isoString) return ''
+  return new Date(isoString).toLocaleDateString('en-CA', {
+    timeZone: ET_TZ,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  })
+}
+
+/**
+ * Format a plain YYYY-MM-DD date string for display (no timezone shift).
+ * Uses noon to avoid any UTC-boundary edge cases.
+ */
+export function formatDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString(ET_LOCALE, { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+export function formatDateShort(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString(ET_LOCALE)
+}
+
 // Calculate invoice totals — handles group workshop (people x sessions x rate)
 // Accepts 'fixed' OR 'amount' for fixed discount (Gemini changed the value to 'amount')
 export function calculateTotals(lineItems, discountType, discountValue, gstEnabled, province) {
@@ -65,18 +98,6 @@ export function formatCAD(amount) {
     currency: 'CAD',
     minimumFractionDigits: 2,
   }).format(amount)
-}
-
-export function formatDate(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-CA', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-export function formatDateShort(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-CA')
 }
 
 export const STATUS_COLORS = {

@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { formatCAD, formatDate } from './invoiceUtils'
+import { formatCAD, formatDate, utcToETDateStr } from './invoiceUtils'
 
 const BRAND = {
   navy:      [21, 52, 95],
@@ -123,9 +123,16 @@ async function buildEmailPDF(invoice) {
 function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 56) {
   const col1 = pageW - margin - 80
   const col2 = col1 + 36
+
+  // Use ET-converted date for "Date Issued" so the PDF matches the app
+  const issuedDateET = formatDate(
+    utcToETDateStr(invoice.created_at) ||
+    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
+  )
+
   const metaRows = [
     ['Invoice #',       invoice.invoice_number],
-    ['Date Issued',     formatDate(invoice.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])],
+    ['Date Issued',     issuedDateET],
     ['Date of Service', formatDate(invoice.service_date)],
     ['Status',          invoice.status?.toUpperCase() || 'DRAFT'],
   ]
@@ -149,18 +156,17 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 56) {
   doc.setLineWidth(0.4)
   doc.line(margin, billY + 1.5, margin + 40, billY + 1.5)
 
-  // ── Client name — wrap to avoid bleeding into the right meta column ──
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
   doc.setTextColor(...BRAND.dark)
-  const maxNameWidth = col1 - margin - 8          // 8mm gap before meta column
+  const maxNameWidth = col1 - margin - 8
   const nameLines = doc.splitTextToSize(invoice.client_name || '', maxNameWidth)
   doc.text(nameLines, margin, billY + 9)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...BRAND.gray)
-  let addressY = billY + 9 + (nameLines.length * 6)  // 6mm per wrapped line
+  let addressY = billY + 9 + (nameLines.length * 6)
 
   if (invoice.client_email) {
     doc.text(invoice.client_email, margin, addressY)

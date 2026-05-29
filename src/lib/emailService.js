@@ -1,5 +1,5 @@
 import emailjs from '@emailjs/browser'
-import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate } from './invoiceUtils'
+import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from './invoiceUtils'
 
 const SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID
 const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
@@ -78,9 +78,13 @@ export async function sendInvoiceEmail(invoice) {
     ? `${taxLabel} applied at ${taxRate}%`
     : 'GST/QST/HST not applicable at this time.'
 
-
   const isPaid = invoice.status === 'paid'
-  const serviceYear = invoice.service_date ? invoice.service_date.split('-')[0] : new Date().getFullYear()
+
+  // Use ET-converted date for "Date Issued" so it matches what the app shows
+  const issuedDateET = formatDate(
+    utcToETDateStr(invoice.created_at) ||
+    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
+  )
 
   const statusBanner = isPaid
     ? `<div style="margin:0 0 24px;padding:20px 28px;background:#dcfce7;border-radius:8px;text-align:center;border:1px solid #86efac;">
@@ -105,7 +109,6 @@ export async function sendInvoiceEmail(invoice) {
 
   const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
-  // Full HTML email — this IS the invoice, beautifully formatted
   const html_body = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -160,7 +163,7 @@ export async function sendInvoiceEmail(invoice) {
                   </tr>
                   <tr>
                     <td style="font-size:11px;text-transform:uppercase;color:#64748b;padding-right:8px;">Date Issued</td>
-                    <td style="font-size:13px;font-weight:600;color:#0f172a;">${formatDate(invoice.created_at?.split('T')[0] || new Date().toISOString().split('T')[0])}</td>
+                    <td style="font-size:13px;font-weight:600;color:#0f172a;">${issuedDateET}</td>
                   </tr>
                   <tr>
                     <td style="font-size:11px;text-transform:uppercase;color:#64748b;padding-right:8px;">Status</td>
@@ -255,10 +258,9 @@ export async function sendInvoiceEmail(invoice) {
     reply_to:       'invoices@aiwithrobert.com',
     invoice_number: invoice.invoice_number,
     total:          formatCAD(invoice.total || 0),
-    html_body,     // The full HTML invoice — your EmailJS template must render this
+    html_body,
   }
 
-  // Check payload size — EmailJS free tier limit is 50KB
   const payloadSize = new TextEncoder().encode(JSON.stringify(templateParams)).length / 1024
   if (payloadSize > 49) {
     throw new Error(`Email payload is ${payloadSize.toFixed(1)}KB which exceeds EmailJS free tier 50KB limit. Upgrade to Personal plan ($9/mo) for larger emails.`)
@@ -266,7 +268,6 @@ export async function sendInvoiceEmail(invoice) {
 
   return emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
     .catch(err => {
-      // Detect quota exceeded error from EmailJS
       const msg = err?.text || err?.message || ''
       if (msg.includes('quota') || msg.includes('limit') || msg.includes('429') || msg.includes('blocked')) {
         throw new Error('EmailJS monthly limit reached (200/200). Upgrade at emailjs.com or wait until your cycle resets on the 10th.')
