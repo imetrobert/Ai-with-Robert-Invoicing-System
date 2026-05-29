@@ -161,8 +161,8 @@ export async function extractSurveyFromFile(file, apiKey) {
 
   // Strip markdown fences and extract JSON object/array
   const stripped = text.replace(/```json|```/g, '').trim()
-  const jsonMatch = stripped.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) throw new Error('RAW RESPONSE: ' + stripped.substring(0, 500))
+  const jsonMatch = stripped.match(/\{[\s\S]*\}(?=[^}]*$)/)
+  if (!jsonMatch) throw new Error('No JSON object found in response')
 
   try {
     return JSON.parse(jsonMatch[0])
