@@ -108,6 +108,8 @@ export default function SurveyUpload() {
   const fileInputRef = useRef(null)
 
   const [stage, setStage] = useState('upload') // 'upload' | 'extracting' | 'review' | 'saving'
+  const [surveys, setSurveys] = useState([]) // all extracted surveys
+  const [surveyIndex, setSurveyIndex] = useState(0) // which one we're reviewing
   const [extractLog, setExtractLog] = useState('')
   const [fileName, setFileName] = useState('')
   const [formData, setFormData] = useState(EMPTY_FORM)
@@ -131,18 +133,23 @@ export default function SurveyUpload() {
 
     try {
       setExtractLog('Sending to Gemini for analysis…')
-      const extracted = await extractSurveyFromFile(file, key)
-      setExtractLog('Extraction complete — please review below.')
+      const extractedArray = await extractSurveyFromFile(file, key)
+      const count = extractedArray.length
+      setExtractLog(`Extraction complete — found ${count} survey${count > 1 ? 's' : ''}. Please review.`)
 
-      // Merge extracted data with empty form defaults
-      setFormData({
+      // Merge each extracted survey with defaults
+      const merged = extractedArray.map(extracted => ({
         ...EMPTY_FORM,
         ...Object.fromEntries(
           Object.entries(extracted).map(([k, v]) => [k, v ?? EMPTY_FORM[k] ?? ''])
         ),
         source_pdf_name: file.name,
         workshop_date: new Date().toISOString().split('T')[0],
-      })
+      }))
+
+      setSurveys(merged)
+      setSurveyIndex(0)
+      setFormData(merged[0])
       setStage('review')
     } catch (err) {
       setError(err.message)
@@ -177,7 +184,17 @@ export default function SurveyUpload() {
     }])
 
     if (dbErr) { setError(dbErr.message); setStage('review'); return }
-    navigate('/surveys')
+
+    // Move to next survey if there are more
+    const nextIndex = surveyIndex + 1
+    if (nextIndex < surveys.length) {
+      setSurveyIndex(nextIndex)
+      setFormData(surveys[nextIndex])
+      setStage('review')
+      setError('')
+    } else {
+      navigate('/surveys')
+    }
   }
 
   // ── Save API key ──────────────────────────────────────────────────────────
@@ -281,6 +298,12 @@ export default function SurveyUpload() {
         {/* ── Review Form ── */}
         {stage === 'review' && (
           <>
+            {surveys.length > 1 && (
+              <div className="alert alert-success" style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>📋 Survey {surveyIndex + 1} of {surveys.length} — {formData.first_name || 'Unknown'} {formData.last_name || ''}</span>
+                <span style={{ fontSize: 12, opacity: 0.8 }}>{surveys.length - surveyIndex - 1} remaining after this</span>
+              </div>
+            )}
             <div className="alert alert-success" style={{ marginBottom: 16 }}>
               ✅ Gemini extracted the fields below — review for accuracy, correct anything needed, then save.
             </div>
@@ -434,7 +457,7 @@ export default function SurveyUpload() {
               </button>
               <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center', fontSize: 15, padding: 14 }}
                 onClick={handleSave} disabled={stage === 'saving'}>
-                {stage === 'saving' ? 'Saving…' : '✓ Save to Database'}
+                {stage === 'saving' ? 'Saving…' : surveys.length > 1 ? `✓ Save & ${surveyIndex + 1 < surveys.length ? `Next (${surveyIndex + 1}/${surveys.length})` : 'Finish'}` : '✓ Save to Database'}
               </button>
             </div>
           </>
