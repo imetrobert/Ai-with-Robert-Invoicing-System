@@ -130,8 +130,13 @@ export async function extractSurveyFromFile(file, apiKey) {
         ]
       }],
       generationConfig: {
-        temperature: 0.1,      // Low temp = more deterministic extraction
-        maxOutputTokens: 2048,
+        temperature: 0.1,
+        maxOutputTokens: 4096,
+        responseMimeType: 'application/json',
+      },
+      // Disable thinking mode — it consumes tokens and causes truncation
+      thinkingConfig: {
+        thinkingBudget: 0
       }
     })
   })
@@ -168,8 +173,13 @@ export async function extractSurveyFromFile(file, apiKey) {
   // Show length in all errors
   const rawPreview = 'len=' + stripped.length + ' ' + stripped.substring(0, 200)
 
-  // Find the first { and last } to extract the JSON object
-  const firstBrace = stripped.indexOf('{')
+  // Handle both array [{...}] and object {...} responses
+  const firstBrace = Math.min(
+    stripped.indexOf('{') === -1 ? Infinity : stripped.indexOf('{'),
+    stripped.indexOf('[') === -1 ? Infinity : stripped.indexOf('[')
+  )
+  const isArray = stripped.indexOf('[') !== -1 && 
+    (stripped.indexOf('{') === -1 || stripped.indexOf('[') < stripped.indexOf('{'))
   const lastBrace = stripped.lastIndexOf('}')
 
   if (firstBrace === -1) {
@@ -206,5 +216,7 @@ export async function extractSurveyFromFile(file, apiKey) {
     }
   }
 
+  // If Gemini returned an array, unwrap the first element
+  if (Array.isArray(parsed)) return parsed[0]
   return parsed
 }
