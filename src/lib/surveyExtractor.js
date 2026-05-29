@@ -147,11 +147,13 @@ export async function extractSurveyFromFile(file, apiKey) {
 
   const data = await response.json()
 
-  // gemini-2.5-flash uses "thinking" — parts can be [thinkingPart, textPart]
-  // so find the first part that actually contains text
+  // gemini-2.5-flash uses "thinking" — parts can include thought + multiple text parts
+  // Concatenate ALL non-thought text parts to get the full response
   const parts = data?.candidates?.[0]?.content?.parts || []
-  const text = parts.find(p => p.text && !p.thought)?.text
-    || parts.find(p => p.text)?.text
+  const text = parts
+    .filter(p => p.text && !p.thought)
+    .map(p => p.text)
+    .join('') || parts.filter(p => p.text).map(p => p.text).join('')
 
   if (!text) {
     console.error('Gemini raw response:', JSON.stringify(data, null, 2))
