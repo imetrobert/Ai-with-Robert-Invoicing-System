@@ -25,6 +25,18 @@ export default function Navbar({ session }) {
       </Link>
 
       <div className="navbar-actions">
+        <Link
+          to="/surveys"
+          style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
+        >
+          Surveys
+        </Link>
+        <Link
+          to="/"
+          style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
+        >
+          Invoices
+        </Link>
         {session?.user?.email && (
           <span className="navbar-user" style={{ display: 'none' }}>{session.user.email}</span>
         )}
