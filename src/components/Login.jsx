@@ -26,7 +26,7 @@ export default function Login() {
           onError={e => { e.target.style.display = 'none' }}
         />
         <h1 className="login-title">AI with Robert</h1>
-        <p className="login-subtitle">Invoicing Portal — Secure Access</p>
+        <p className="login-subtitle">Admin Portal — Secure Access</p>
 
         {error && <div className="login-error">{error}</div>}
 
