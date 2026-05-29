@@ -3,7 +3,7 @@
 // Free tier: 15 req/min, 1500 req/day — more than enough for workshop volumes
 
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 const EXTRACTION_PROMPT = `You are extracting data from a handwritten survey form for "AI with Robert" workshops.
 
