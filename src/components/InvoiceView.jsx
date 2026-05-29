@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
-import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate } from '../lib/invoiceUtils'
+import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 
 export default function InvoiceView() {
   const { id } = useParams()
@@ -63,7 +63,6 @@ export default function InvoiceView() {
     await supabase.from('invoices').update({ status: newStatus }).eq('id', id)
     setInvoice(prev => ({ ...prev, status: newStatus }))
     setStatusSaving(false)
-    // Offer to resend confirmation email when marking as paid
     if (newStatus === 'paid' && invoice.client_email) {
       setShowResendModal(true)
     }
@@ -103,18 +102,18 @@ export default function InvoiceView() {
           {invoice.emailed_at && (
             <span style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              Emailed {formatDateShort(invoice.emailed_at?.split('T')[0])}
+              Emailed {formatDateShort(utcToETDateStr(invoice.emailed_at))}
             </span>
           )}
           {invoice.view_count > 0 && (
             <span style={{ fontSize: 12, color: 'var(--blue)', fontWeight: 600 }}>
               👁 {invoice.view_count} view{invoice.view_count !== 1 ? 's' : ''}
-              {invoice.first_viewed_at ? ` · first opened ${formatDateShort(invoice.first_viewed_at?.split('T')[0])}` : ''}
+              {invoice.first_viewed_at ? ` · first opened ${formatDateShort(utcToETDateStr(invoice.first_viewed_at))}` : ''}
             </span>
           )}
         </div>
 
-        {/* Action buttons — full width on mobile */}
+        {/* Action buttons */}
         <div className="invoice-actions">
           <Link to={`/invoice/${id}/edit`} className="btn btn-ghost btn-sm">Edit</Link>
           <button className="btn btn-primary btn-sm" onClick={handlePDF} disabled={pdfLoading}>
@@ -165,12 +164,11 @@ export default function InvoiceView() {
               </div>
               <div style={{ textAlign: 'right' }}>
                 <MetaRow label="Service Date" value={formatDate(invoice.service_date)} />
-                <MetaRow label="Issued" value={formatDate(invoice.created_at?.split('T')[0])} />
-                {invoice.emailed_at && <MetaRow label="Emailed" value={formatDate(invoice.emailed_at?.split('T')[0])} />}
+                <MetaRow label="Issued" value={formatDate(utcToETDateStr(invoice.created_at))} />
+                {invoice.emailed_at && <MetaRow label="Emailed" value={formatDate(utcToETDateStr(invoice.emailed_at))} />}
               </div>
             </div>
 
-            {/* Scrollable table on mobile */}
             <div className="table-scroll">
               <table className="data-table" style={{ marginBottom: 16 }}>
                 <thead>
@@ -262,7 +260,6 @@ export default function InvoiceView() {
                 setEmailLoading(true)
                 setEmailMsg(null)
                 try {
-                  // Use updated invoice with paid status
                   await sendInvoiceEmail({ ...invoice, status: 'paid' })
                   const now = new Date().toISOString()
                   await supabase.from('invoices').update({ emailed_at: now }).eq('id', id)

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { formatCAD, formatDateShort, formatDate, STATUS_COLORS } from '../lib/invoiceUtils'
+import { formatCAD, formatDateShort, formatDate, STATUS_COLORS, utcToETDateStr } from '../lib/invoiceUtils'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -63,12 +63,12 @@ function escapeCSV(val) {
 function exportToCSV(invoices) {
   const headers = [
     'Invoice #', 'Status', 'Client Name', 'Client Email',
-    'Service Date', 'Created Date',
+    'Service Date', 'Created Date (ET)',
     'Province',
     'Address Line 1', 'Address Line 2', 'City', 'Postal Code',
     'Subtotal (CAD)', 'Discount Type', 'Discount Value', 'Discount Amount (CAD)',
     'Tax Enabled', 'Tax Amount (CAD)', 'Total (CAD)',
-    'Emailed', 'Emailed Date', 'Views',
+    'Emailed', 'Emailed Date (ET)', 'Views',
     'Notes',
   ]
 
@@ -78,7 +78,7 @@ function exportToCSV(invoices) {
     inv.client_name,
     inv.client_email || '',
     inv.service_date || '',
-    inv.created_at ? inv.created_at.split('T')[0] : '',
+    inv.created_at ? utcToETDateStr(inv.created_at) : '',
     inv.province || '',
     inv.address_line1 || '',
     inv.address_line2 || '',
@@ -92,7 +92,7 @@ function exportToCSV(invoices) {
     inv.gst_amount != null ? inv.gst_amount.toFixed(2) : '0.00',
     inv.total != null ? inv.total.toFixed(2) : '',
     inv.emailed_at ? 'Yes' : 'No',
-    inv.emailed_at ? inv.emailed_at.split('T')[0] : '',
+    inv.emailed_at ? utcToETDateStr(inv.emailed_at) : '',
     inv.view_count != null ? inv.view_count : 0,
     inv.notes || '',
   ])
@@ -123,13 +123,12 @@ export default function Dashboard() {
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [search, setSearch]           = useState('')       // legacy quick search (still shown above list)
-  const [statusFilter, setStatusFilter] = useState('all') // 'all'|'draft'|'sent'|'paid'
+  const [search, setSearch]           = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [datePreset, setDatePreset]   = useState('all')
   const [customFrom, setCustomFrom]   = useState('')
   const [customTo, setCustomTo]       = useState('')
 
-  // Client-name filter with autocomplete
   const [clientFilter, setClientFilter]           = useState('')
   const [clientSuggestions, setClientSuggestions] = useState([])
   const [showClientSug, setShowClientSug]         = useState(false)
@@ -178,7 +177,6 @@ export default function Dashboard() {
   const filtered = useMemo(() => {
     let result = invoices
 
-    // Quick search (invoice # or client name)
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(inv =>
@@ -187,18 +185,15 @@ export default function Dashboard() {
       )
     }
 
-    // Status
     if (statusFilter !== 'all') {
       result = result.filter(inv => (inv.status || 'draft') === statusFilter)
     }
 
-    // Client name filter (exact/partial)
     if (clientFilter.trim()) {
       const q = clientFilter.toLowerCase()
       result = result.filter(inv => inv.client_name?.toLowerCase().includes(q))
     }
 
-    // Date range
     if (datePreset !== 'all') {
       let fromDate, toDate
       if (datePreset === 'custom') {
@@ -229,23 +224,27 @@ export default function Dashboard() {
     clientFilter.trim() !== '',
   ].filter(Boolean).length
 
-  // ── Stats (based on ALL invoices, not filtered view) ──────────────────────
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const outstanding  = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
 
-  // EmailJS quota
+  // EmailJS quota — cycle resets on the 10th; compare dates in ET
   const emailsUsed = (() => {
-    const now = new Date()
-    const cycleStart = new Date(now.getFullYear(), now.getMonth(), 10)
-    if (now < cycleStart) cycleStart.setMonth(cycleStart.getMonth() - 1)
-    return invoices.filter(i => i.emailed_at && new Date(i.emailed_at) >= cycleStart).length
+    const nowET        = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' }))
+    const cycleStart   = new Date(nowET.getFullYear(), nowET.getMonth(), 10)
+    if (nowET < cycleStart) cycleStart.setMonth(cycleStart.getMonth() - 1)
+    return invoices.filter(i => {
+      if (!i.emailed_at) return false
+      const emailedET = new Date(new Date(i.emailed_at).toLocaleString('en-US', { timeZone: 'America/Toronto' }))
+      return emailedET >= cycleStart
+    }).length
   })()
   const EMAIL_LIMIT = 200
   const emailsLeft  = EMAIL_LIMIT - emailsUsed
   const emailPct    = (emailsUsed / EMAIL_LIMIT) * 100
   const emailColor  = emailPct >= 95 ? 'var(--danger)' : emailPct >= 80 ? '#d97706' : 'var(--success)'
 
-  // ── Filtered stats (shown when filters are active) ─────────────────────────
+  // ── Filtered stats ─────────────────────────────────────────────────────────
   const filteredRevenue     = filtered.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const filteredOutstanding = filtered.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const isFiltered          = activeFilterCount > 0 || search.trim() !== ''
@@ -319,7 +318,6 @@ export default function Dashboard() {
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
 
-            {/* Filter toggle button */}
             <button
               className={`btn btn-sm ${filtersOpen ? 'btn-navy' : 'btn-ghost'}`}
               onClick={() => setFiltersOpen(p => !p)}
@@ -343,7 +341,6 @@ export default function Dashboard() {
               )}
             </button>
 
-            {/* Export CSV button */}
             <button
               className="btn btn-sm btn-ghost"
               onClick={() => exportToCSV(filtered)}
@@ -360,7 +357,6 @@ export default function Dashboard() {
               <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({filtered.length})</span>
             </button>
 
-            {/* Clear all filters */}
             {(activeFilterCount > 0 || search.trim()) && (
               <button
                 className="btn btn-sm"
@@ -376,7 +372,6 @@ export default function Dashboard() {
           {filtersOpen && (
             <div className="card" style={{ marginTop: 10, padding: 16 }}>
 
-              {/* Status filter */}
               <div style={{ marginBottom: 16 }}>
                 <div className="filter-section-label">Status</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -407,9 +402,8 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Date range */}
               <div style={{ marginBottom: 16 }}>
-                <div className="filter-section-label">Date Created</div>
+                <div className="filter-section-label">Date Created (Eastern Time)</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {DATE_PRESETS.map(p => (
                     <button
@@ -422,7 +416,6 @@ export default function Dashboard() {
                   ))}
                 </div>
 
-                {/* Custom date range pickers */}
                 {datePreset === 'custom' && (
                   <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -461,7 +454,6 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Client name filter */}
               <div>
                 <div className="filter-section-label">Client Name</div>
                 <div className="autocomplete-wrapper" style={{ maxWidth: 340 }}>

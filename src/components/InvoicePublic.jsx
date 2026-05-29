@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
-import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate } from '../lib/invoiceUtils'
+import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 
 export default function InvoicePublic() {
   const { token } = useParams()
@@ -12,7 +12,6 @@ export default function InvoicePublic() {
   const [pdfLoading, setPdfLoading] = useState(false)
 
   useEffect(() => {
-    // Prevent search engines from indexing public invoice pages
     const meta = document.createElement('meta')
     meta.name = 'robots'
     meta.content = 'noindex, nofollow'
@@ -36,7 +35,6 @@ export default function InvoicePublic() {
     setInvoice(data)
     setLoading(false)
 
-    // Increment view count via RPC
     await supabase.rpc('increment_invoice_view', { token })
   }
 
@@ -120,7 +118,7 @@ export default function InvoicePublic() {
               </div>
               <div>
                 <MetaRow label="Date of Service" value={formatDate(invoice.service_date)} />
-                <MetaRow label="Date Issued" value={formatDate(invoice.created_at?.split('T')[0])} />
+                <MetaRow label="Date Issued" value={formatDate(utcToETDateStr(invoice.created_at))} />
                 <MetaRow label="Status" value={(invoice.status || 'draft').toUpperCase()} />
               </div>
             </div>
@@ -192,7 +190,6 @@ export default function InvoicePublic() {
           </div>
         </div>
 
-        {/* Download prompt */}
         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 13 }}>
           Questions? Contact us at <a href="mailto:invoices@aiwithrobert.com" style={{ color: 'var(--blue)' }}>invoices@aiwithrobert.com</a>
         </div>
