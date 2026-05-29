@@ -6,6 +6,8 @@ import Dashboard from './components/Dashboard'
 import InvoiceForm from './components/InvoiceForm'
 import InvoiceView from './components/InvoiceView'
 import InvoicePublic from './components/InvoicePublic'
+import SurveyDashboard from './components/SurveyDashboard'
+import SurveyUpload from './components/SurveyUpload'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -34,11 +36,13 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" replace />} />
-        <Route path="/"           element={session ? <Dashboard /> : <Navigate to="/login" replace />} />
-        <Route path="/invoice/new" element={session ? <InvoiceForm /> : <Navigate to="/login" replace />} />
-        <Route path="/invoice/:id" element={session ? <InvoiceView /> : <Navigate to="/login" replace />} />
-        <Route path="/invoice/:id/edit" element={session ? <InvoiceForm /> : <Navigate to="/login" replace />} />
+        <Route path="/"                element={session ? <Dashboard />      : <Navigate to="/login" replace />} />
+        <Route path="/invoice/new"     element={session ? <InvoiceForm />    : <Navigate to="/login" replace />} />
+        <Route path="/invoice/:id"     element={session ? <InvoiceView />    : <Navigate to="/login" replace />} />
+        <Route path="/invoice/:id/edit" element={session ? <InvoiceForm />   : <Navigate to="/login" replace />} />
         <Route path="/invoice/public/:token" element={<InvoicePublic />} />
+        <Route path="/surveys"         element={session ? <SurveyDashboard /> : <Navigate to="/login" replace />} />
+        <Route path="/surveys/upload"  element={session ? <SurveyUpload />   : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
