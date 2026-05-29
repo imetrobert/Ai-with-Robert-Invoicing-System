@@ -159,14 +159,28 @@ export async function extractSurveyFromFile(file, apiKey) {
   }
   console.log('Gemini raw text:', text)
 
-  // Strip markdown fences and extract JSON object/array
-  const stripped = text.replace(/```json|```/g, '').trim()
-  const jsonMatch = stripped.match(/\{[\s\S]*\}(?=[^}]*$)/)
-  if (!jsonMatch) throw new Error('No JSON object found in response')
+  // Strip markdown fences
+  let stripped = text.replace(/```json|```/g, '').trim()
+
+  // Find the first { and last } to extract the JSON object
+  const firstBrace = stripped.indexOf('{')
+  const lastBrace = stripped.lastIndexOf('}')
+
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    throw new Error('No JSON object found — raw: ' + stripped.substring(0, 300))
+  }
+
+  const jsonStr = stripped.substring(firstBrace, lastBrace + 1)
 
   try {
-    return JSON.parse(jsonMatch[0])
-  } catch {
-    throw new Error('Could not parse Gemini response as JSON — try again')
+    return JSON.parse(jsonStr)
+  } catch (parseErr) {
+    // Last resort: try to fix common JSON issues (trailing commas, etc)
+    try {
+      const fixed = jsonStr.replace(/,\s*([}\]])/g, '$1')
+      return JSON.parse(fixed)
+    } catch {
+      throw new Error('JSON parse failed — raw: ' + stripped.substring(0, 300))
+    }
   }
 }
