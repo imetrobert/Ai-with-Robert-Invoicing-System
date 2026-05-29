@@ -3,7 +3,7 @@
 // Free tier: 15 req/min, 1500 req/day — more than enough for workshop volumes
 
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent'
 
 const EXTRACTION_PROMPT = `You are extracting data from a handwritten survey form for "AI with Robert" workshops.
 
@@ -134,10 +134,7 @@ export async function extractSurveyFromFile(file, apiKey) {
         maxOutputTokens: 4096,
         responseMimeType: 'application/json',
       },
-      // Disable thinking mode — it consumes tokens and causes truncation
-      thinkingConfig: {
-        thinkingBudget: 0
-      }
+      // thinkingConfig not needed for 2.0-flash-lite
     })
   })
 
