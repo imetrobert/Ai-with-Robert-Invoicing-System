@@ -146,15 +146,22 @@ export async function extractSurveyFromFile(file, apiKey) {
   }
 
   const data = await response.json()
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
 
-  if (!text) throw new Error('Gemini returned an empty response')
+  // gemini-2.5-flash uses "thinking" — parts can be [thinkingPart, textPart]
+  // so find the first part that actually contains text
+  const parts = data?.candidates?.[0]?.content?.parts || []
+  const text = parts.find(p => p.text && !p.thought)?.text
+    || parts.find(p => p.text)?.text
 
-  // Strip any accidental markdown fences
-  const clean = text.replace(/```json|```/g, '').trim()
+  if (!text) throw new Error('Gemini returned an empty response — try again')
+
+  // Strip markdown fences and extract JSON object/array
+  const stripped = text.replace(/```json|```/g, '').trim()
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) throw new Error('No JSON found in Gemini response — try again')
 
   try {
-    return JSON.parse(clean)
+    return JSON.parse(jsonMatch[0])
   } catch {
     throw new Error('Could not parse Gemini response as JSON — try again')
   }
