@@ -156,6 +156,8 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   border-radius: var(--radius);
   cursor: pointer;
   transition: all .15s;
+  position: relative;
+  overflow: hidden;
 }
 .invoice-row:hover { border-color: var(--blue); box-shadow: 0 2px 10px rgba(37,99,235,.1); }
 
@@ -178,6 +180,70 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .invoice-client { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .invoice-date { font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .invoice-amount { font-weight: 700; font-size: 15px; color: var(--navy); flex-shrink: 0; }
+
+/* ── Invoice row status highlights ── */
+
+/* Sent = red outline (unpaid) */
+.invoice-row-unpaid {
+  border-color: #fca5a5 !important;
+  background: #fff8f8 !important;
+  padding-left: 18px !important;
+}
+.invoice-row-unpaid:hover {
+  border-color: var(--danger) !important;
+  box-shadow: 0 2px 10px rgba(220,38,38,.12) !important;
+}
+.unpaid-accent {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--danger);
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.unpaid-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid #fca5a5;
+  border-radius: 20px;
+  padding: 2px 7px;
+  letter-spacing: .3px;
+}
+
+/* Paid = green outline */
+.invoice-row-paid {
+  border-color: #86efac !important;
+  background: #f0fdf4 !important;
+  padding-left: 18px !important;
+}
+.invoice-row-paid:hover {
+  border-color: var(--success) !important;
+  box-shadow: 0 2px 10px rgba(21,128,61,.1) !important;
+}
+.paid-accent {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--success);
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.paid-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid #86efac;
+  border-radius: 20px;
+  padding: 2px 7px;
+  letter-spacing: .3px;
+}
 
 /* ── Status badge ── */
 .badge {
