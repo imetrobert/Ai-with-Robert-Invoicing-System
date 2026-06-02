@@ -125,7 +125,8 @@ export async function sendInvoiceEmail(invoice) {
               <td>
                 <div style="color:white;font-size:20px;font-weight:700;margin-bottom:4px;">AI with Robert</div>
                 <div style="color:rgba(200,220,255,0.9);font-size:12px;">AI &amp; Technology Training for Seniors</div>
-                <div style="color:rgba(200,220,255,0.9);font-size:12px;">invoices@aiwithrobert.com &nbsp;&middot;&nbsp; 514-250-8491</div>
+                <div style="color:rgba(200,220,255,0.9);font-size:12px;">5550 Lyndale, Cote Saint-Luc, Quebec &nbsp;H4V 2L5</div>
+                <div style="color:rgba(200,220,255,0.9);font-size:12px;">invoices@aiwithrobert.com &nbsp;&middot;&nbsp; (514) 250-8491</div>
               </td>
               <td align="right">
                 <div style="color:white;font-size:28px;font-weight:800;letter-spacing:2px;">INVOICE</div>
@@ -238,9 +239,10 @@ export async function sendInvoiceEmail(invoice) {
 
       <!-- Footer -->
       <tr>
-        <td style="background:#153457;padding:16px 28px;text-align:center;margin-top:8px;">
+        <td style="background:#153457;padding:20px 28px;text-align:center;margin-top:8px;">
           <div style="color:rgba(180,200,240,0.9);font-size:12px;margin-bottom:4px;">Thank you for choosing AI with Robert!</div>
-          <div style="color:rgba(255,255,255,0.85);font-size:11px;">aiwithrobert.com &nbsp;&middot;&nbsp; invoices@aiwithrobert.com &nbsp;&middot;&nbsp; 514-250-8491</div>
+          <div style="color:rgba(255,255,255,0.85);font-size:11px;">5550 Lyndale, Cote Saint-Luc, Quebec &nbsp;H4V 2L5</div>
+          <div style="color:rgba(255,255,255,0.75);font-size:11px;margin-top:2px;">aiwithrobert.com &nbsp;&middot;&nbsp; invoices@aiwithrobert.com &nbsp;&middot;&nbsp; (514) 250-8491</div>
           <div style="color:rgba(255,255,255,0.65);font-size:10px;margin-top:4px;">${taxFooter}</div>
         </td>
       </tr>

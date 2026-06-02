@@ -65,9 +65,9 @@ function drawHeader(doc, pageW, margin, logoData) {
   doc.setFillColor(...BRAND.lightGray)
   doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), 'F')
   doc.setFillColor(...BRAND.navy)
-  doc.rect(0, 0, pageW, 44, 'F')
+  doc.rect(0, 0, pageW, 50, 'F')
   doc.setFillColor(...BRAND.blue)
-  doc.rect(0, 44, pageW, 3, 'F')
+  doc.rect(0, 50, pageW, 3, 'F')
 
   if (logoData) {
     doc.addImage(logoData, 'JPEG', margin, 8, 28, 28, undefined, 'FAST')
@@ -76,17 +76,17 @@ function drawHeader(doc, pageW, margin, logoData) {
   doc.setTextColor(...BRAND.white)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
-  doc.text('AI with Robert', margin + 32, 22)
+  doc.text('AI with Robert', margin + 32, 20)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(200, 220, 255)
-  doc.text('AI & Technology Training for Seniors', margin + 32, 28)
-  doc.text('Cote Saint-Luc, Quebec', margin + 32, 33)
-  doc.text('invoices@aiwithrobert.com  .  514-250-8491  .  aiwithrobert.com', margin + 32, 38)
+  doc.text('AI & Technology Training for Seniors', margin + 32, 27)
+  doc.text('5550 Lyndale, Cote Saint-Luc, Quebec  H4V 2L5', margin + 32, 33)
+  doc.text('invoices@aiwithrobert.com  ·  (514) 250-8491  ·  aiwithrobert.com', margin + 32, 39)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(26)
   doc.setTextColor(...BRAND.white)
-  doc.text('INVOICE', pageW - margin, 26, { align: 'right' })
+  doc.text('INVOICE', pageW - margin, 28, { align: 'right' })
 }
 
 function drawBody(doc, invoice, margin, pageW) {
@@ -120,7 +120,7 @@ async function buildEmailPDF(invoice) {
 }
 
 // ── Shared drawing helpers ───────────────────────────────────────────────────
-function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 56) {
+function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   const col1 = pageW - margin - 80
   const col2 = col1 + 36
 
@@ -188,7 +188,7 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 56) {
   }
 }
 
-function _drawServicesTable(doc, invoice, margin, startY = 88) {
+function _drawServicesTable(doc, invoice, margin, startY = 96) {
   const services = Array.isArray(invoice.services) ? invoice.services : []
   autoTable(doc, {
     startY,
@@ -277,20 +277,21 @@ function _drawNotes(doc, invoice, margin, pageW) {
 }
 
 function _drawFooter(doc, invoice, pageH, margin, pageW) {
-  const footY = pageH - 16
+  const footY = pageH - 20
   doc.setFillColor(...BRAND.navy)
-  doc.rect(0, footY, pageW, 16, 'F')
+  doc.rect(0, footY, pageW, 20, 'F')
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
   doc.setTextColor(180, 200, 240)
-  doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 6, { align: 'center' })
-  doc.text('aiwithrobert.com  .  invoices@aiwithrobert.com  .  514-250-8491', pageW / 2, footY + 11.5, { align: 'center' })
+  doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 5, { align: 'center' })
+  doc.text('5550 Lyndale, Cote Saint-Luc, Quebec  H4V 2L5', pageW / 2, footY + 10, { align: 'center' })
+  doc.text('aiwithrobert.com  ·  invoices@aiwithrobert.com  ·  (514) 250-8491', pageW / 2, footY + 15, { align: 'center' })
   doc.setTextColor(150, 170, 210)
   doc.setFontSize(6.5)
   const taxNote = invoice.gst_enabled
     ? `${getTaxLabel(invoice.province)} applied at ${getTaxRate(invoice.province)}%`
     : 'GST/QST/HST not applicable at this time.'
-  doc.text(taxNote, margin, footY + 6)
+  doc.text(taxNote, margin, footY + 10)
 }
 
 // ── Tax helpers ──────────────────────────────────────────────────────────────
