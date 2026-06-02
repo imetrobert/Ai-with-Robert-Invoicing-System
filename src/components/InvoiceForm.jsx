@@ -27,6 +27,78 @@ function NumInput({ value, onChange, min = '0', step = '1', style = {}, label })
   )
 }
 
+// ── Generic autocomplete field ────────────────────────────────────────────────
+function AutocompleteField({
+  label, value, onChange, suggestions, onSelect,
+  placeholder, type = 'text', required = false, inputRef,
+}) {
+  const [show, setShow] = useState(false)
+  const [filtered, setFiltered] = useState([])
+
+  function handleChange(val) {
+    onChange(val)
+    if (val.length > 0) {
+      const matches = suggestions.filter(s =>
+        s.toLowerCase().includes(val.toLowerCase())
+      )
+      setFiltered(matches)
+      setShow(matches.length > 0)
+    } else {
+      setShow(false)
+    }
+  }
+
+  function handleSelect(val) {
+    onSelect ? onSelect(val) : onChange(val)
+    setShow(false)
+  }
+
+  return (
+    <div className="form-group">
+      {label && (
+        <label className="form-label">
+          {label}{required && <span className="required"> *</span>}
+        </label>
+      )}
+      <div className="autocomplete-wrapper">
+        <input
+          ref={inputRef}
+          type={type}
+          className="form-control"
+          value={value}
+          placeholder={placeholder}
+          required={required}
+          autoComplete="off"
+          onChange={e => handleChange(e.target.value)}
+          onFocus={() => {
+            if (value && suggestions.length) {
+              const matches = suggestions.filter(s =>
+                s.toLowerCase().includes(value.toLowerCase())
+              )
+              setFiltered(matches)
+              setShow(matches.length > 0)
+            }
+          }}
+          onBlur={() => setTimeout(() => setShow(false), 150)}
+        />
+        {show && (
+          <div className="autocomplete-list">
+            {filtered.map((item, i) => (
+              <div
+                key={i}
+                className="autocomplete-item"
+                onMouseDown={() => handleSelect(item)}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function InvoiceForm() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -52,9 +124,18 @@ export default function InvoiceForm() {
   const [gstEnabled, setGstEnabled] = useState(false)
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState('draft')
-  const [allClients, setAllClients] = useState([])
-  const [clientSuggestions, setClientSuggestions] = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  // ── All past client records for autocomplete ──────────────────────────────
+  const [allClients, setAllClients] = useState([]) // full invoice rows
+  // Derived suggestion lists (unique values)
+  const [nameSuggestions, setNameSuggestions]     = useState([])
+  const [emailSuggestions, setEmailSuggestions]   = useState([])
+  const [addr1Suggestions, setAddr1Suggestions]   = useState([])
+  const [addr2Suggestions, setAddr2Suggestions]   = useState([])
+  const [citySuggestions, setCitySuggestions]     = useState([])
+  const [postalSuggestions, setPostalSuggestions] = useState([])
+  const [notesSuggestions, setNotesSuggestions]   = useState([])
+
   const clientInputRef = useRef(null)
 
   useEffect(() => {
@@ -65,8 +146,23 @@ export default function InvoiceForm() {
   }, [id])
 
   async function fetchClients() {
-    const { data } = await supabase.from('invoices').select('client_name').order('client_name')
-    if (data) setAllClients([...new Set(data.map(r => r.client_name).filter(Boolean))])
+    const { data } = await supabase
+      .from('invoices')
+      .select('client_name, client_email, address_line1, address_line2, address_city, address_postal, province, notes')
+      .order('created_at', { ascending: false })
+
+    if (!data) return
+    setAllClients(data)
+
+    // Build unique suggestion lists preserving most-recent order
+    const unique = (arr) => [...new Set(arr.filter(Boolean))]
+    setNameSuggestions(unique(data.map(r => r.client_name)))
+    setEmailSuggestions(unique(data.map(r => r.client_email)))
+    setAddr1Suggestions(unique(data.map(r => r.address_line1)))
+    setAddr2Suggestions(unique(data.map(r => r.address_line2)))
+    setCitySuggestions(unique(data.map(r => r.address_city)))
+    setPostalSuggestions(unique(data.map(r => r.address_postal)))
+    setNotesSuggestions(unique(data.map(r => r.notes)))
   }
 
   async function generateNumber() {
@@ -97,13 +193,34 @@ export default function InvoiceForm() {
     setLoading(false)
   }
 
-  function handleClientInput(val) {
-    setClientName(val)
-    if (val.length > 0) {
-      const matches = allClients.filter(c => c.toLowerCase().includes(val.toLowerCase()))
-      setClientSuggestions(matches)
-      setShowSuggestions(matches.length > 0)
-    } else setShowSuggestions(false)
+  // When a client name is selected, pre-fill only if there's exactly one
+  // unique address+email combination for that contact across all invoices.
+  function handleClientSelect(name) {
+    setClientName(name)
+
+    const matches = allClients.filter(r => r.client_name === name)
+    if (!matches.length) return
+
+    // Build a fingerprint of address+email for each invoice for this contact
+    const fingerprint = r =>
+      [r.client_email, r.address_line1, r.address_line2, r.address_city, r.address_postal, r.province]
+        .map(v => (v || '').trim().toLowerCase())
+        .join('|')
+
+    const unique = [...new Map(matches.map(r => [fingerprint(r), r])).values()]
+
+    // Only auto-fill if every invoice for this contact has the same combination
+    if (unique.length === 1) {
+      const c = unique[0]
+      if (c.client_email)    setClientEmail(c.client_email)
+      if (c.address_line1)   setAddressLine1(c.address_line1)
+      setAddressLine2(c.address_line2 || '')
+      if (c.address_city)    setAddressCity(c.address_city)
+      if (c.address_postal)  setAddressPostal(c.address_postal)
+      if (c.province)        setProvince(c.province)
+    }
+    // If multiple distinct combinations exist, leave all address fields blank
+    // so the user fills them in intentionally
   }
 
   function handleServiceSelect(idx, serviceId) {
@@ -144,6 +261,10 @@ export default function InvoiceForm() {
     const payload = {
       invoice_number: invoiceNumber, client_name: clientName.trim(),
       client_email: clientEmail.trim() || null, province: province || null,
+      address_line1: addressLine1.trim() || null,
+      address_line2: addressLine2.trim() || null,
+      address_city: addressCity.trim() || null,
+      address_postal: addressPostal.trim() || null,
       service_date: serviceDate, services: lineItems.filter(l => l.service_name),
       discount_type: discountType,
       discount_value: discountType !== 'none' ? parseFloat(discountValue) || 0 : 0,
@@ -196,54 +317,72 @@ export default function InvoiceForm() {
                   </select>
                 </div>
               </div>
-              <div className="form-group">
-                <label className="form-label">Client Name <span className="required">*</span></label>
-                <div className="autocomplete-wrapper">
-                  <input ref={clientInputRef} className="form-control" value={clientName}
-                    onChange={e => handleClientInput(e.target.value)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    placeholder="e.g. Marie Tremblay" required autoComplete="off" />
-                  {showSuggestions && (
-                    <div className="autocomplete-list">
-                      {clientSuggestions.map(name => (
-                        <div key={name} className="autocomplete-item" onMouseDown={() => { setClientName(name); setShowSuggestions(false) }}>{name}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Client Email</label>
-                <input type="email" className="form-control" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="client@email.com" />
-              </div>
+
+              {/* Client Name — selecting auto-fills all address fields */}
+              <AutocompleteField
+                label="Client Name"
+                required
+                inputRef={clientInputRef}
+                value={clientName}
+                onChange={setClientName}
+                onSelect={handleClientSelect}
+                suggestions={nameSuggestions}
+                placeholder="e.g. Marie Tremblay"
+              />
+
+              <AutocompleteField
+                label="Client Email"
+                type="email"
+                value={clientEmail}
+                onChange={setClientEmail}
+                suggestions={emailSuggestions}
+                placeholder="client@email.com"
+              />
+
               <div className="form-group" style={{ maxWidth: 240 }}>
                 <label className="form-label">Date of Service <span className="required">*</span></label>
                 <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
               </div>
 
-              {/* Optional address section */}
+              {/* Address section */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
-                  Client Address <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', fontSize: 12 }}>(optional)</span>
+                  Client Address <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', fontSize: 12 }}>(optional — selecting a client name above auto-fills these)</span>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Street Address</label>
-                  <input className="form-control" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="123 Main Street" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Apt / Suite / Unit</label>
-                  <input className="form-control" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 4B" />
-                </div>
+
+                <AutocompleteField
+                  label="Street Address"
+                  value={addressLine1}
+                  onChange={setAddressLine1}
+                  suggestions={addr1Suggestions}
+                  placeholder="123 Main Street"
+                />
+
+                <AutocompleteField
+                  label="Apt / Suite / Unit"
+                  value={addressLine2}
+                  onChange={setAddressLine2}
+                  suggestions={addr2Suggestions}
+                  placeholder="Apt 4B"
+                />
+
                 <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">City</label>
-                    <input className="form-control" value={addressCity} onChange={e => setAddressCity(e.target.value)} placeholder="Montreal" />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Postal Code</label>
-                    <input className="form-control" value={addressPostal} onChange={e => setAddressPostal(e.target.value.toUpperCase())} placeholder="H3Z 2Y7" maxLength={7} />
-                  </div>
+                  <AutocompleteField
+                    label="City"
+                    value={addressCity}
+                    onChange={setAddressCity}
+                    suggestions={citySuggestions}
+                    placeholder="Montreal"
+                  />
+                  <AutocompleteField
+                    label="Postal Code"
+                    value={addressPostal}
+                    onChange={v => setAddressPostal(v.toUpperCase())}
+                    suggestions={postalSuggestions}
+                    placeholder="H3Z 2Y7"
+                  />
                 </div>
+
                 <div className="form-group">
                   <label className="form-label">Province</label>
                   <select className="form-control" value={province} onChange={e => setProvince(e.target.value)}>
@@ -307,7 +446,6 @@ export default function InvoiceForm() {
                       </button>
                     </div>
 
-                    {/* Per-line amount */}
                     {lineTotal(item) > 0 && (
                       <div className="line-item-amount">
                         {item.service_id === 'group-workshop'
@@ -353,7 +491,6 @@ export default function InvoiceForm() {
                 <span><strong>Include {taxLabel}{province ? ` (${taxRate}%)` : ''}</strong>{!province && ' — Select province first'}</span>
               </div>
 
-              {/* Live totals — always visible */}
               <div className="form-totals">
                 <div className="form-totals-row"><span>Subtotal</span><span>{formatCAD(totals.subtotal)}</span></div>
                 {totals.discountAmount > 0 && (
@@ -371,8 +508,20 @@ export default function InvoiceForm() {
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="card-header"><h2>Notes</h2></div>
             <div className="card-body">
-              <textarea className="form-control" value={notes} onChange={e => setNotes(e.target.value)}
-                placeholder="e.g. Referral discount applied. Thanks for your business!" />
+              <div className="autocomplete-wrapper">
+                <textarea
+                  className="form-control"
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="e.g. Referral discount applied. Thanks for your business!"
+                />
+                {/* Notes suggestions shown as a dropdown when focused and matching */}
+                <NotesSuggest
+                  value={notes}
+                  suggestions={notesSuggestions}
+                  onSelect={setNotes}
+                />
+              </div>
             </div>
           </div>
 
@@ -382,7 +531,6 @@ export default function InvoiceForm() {
         </form>
       </div>
 
-      {/* Sticky total bar — visible while scrolling on mobile */}
       <div className="sticky-totals">
         <div>
           <div className="sticky-totals-label">Total Due (CAD)</div>
@@ -392,6 +540,41 @@ export default function InvoiceForm() {
         </div>
         <div className="sticky-totals-amount">{formatCAD(totals.total)}</div>
       </div>
+    </div>
+  )
+}
+
+// Separate notes suggest to handle textarea (not an input)
+function NotesSuggest({ value, suggestions, onSelect }) {
+  const [show, setShow] = useState(false)
+  const [filtered, setFiltered] = useState([])
+
+  useEffect(() => {
+    if (value && value.length > 2) {
+      const matches = suggestions.filter(s =>
+        s && s.toLowerCase().includes(value.toLowerCase()) && s !== value
+      )
+      setFiltered(matches.slice(0, 5))
+      setShow(matches.length > 0)
+    } else {
+      setShow(false)
+    }
+  }, [value, suggestions])
+
+  if (!show) return null
+
+  return (
+    <div className="autocomplete-list" style={{ top: '100%' }}>
+      {filtered.map((item, i) => (
+        <div
+          key={i}
+          className="autocomplete-item"
+          onMouseDown={() => { onSelect(item); setShow(false) }}
+          style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+        >
+          {item}
+        </div>
+      ))}
     </div>
   )
 }

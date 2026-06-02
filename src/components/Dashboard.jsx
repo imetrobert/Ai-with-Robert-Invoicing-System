@@ -121,7 +121,6 @@ export default function Dashboard() {
   const [session, setSession]         = useState(null)
   const navigate                      = useNavigate()
 
-  // ── Filter state ──────────────────────────────────────────────────────────
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -155,7 +154,6 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  // ── Client autocomplete ────────────────────────────────────────────────────
   const allClientNames = useMemo(() =>
     [...new Set(invoices.map(i => i.client_name).filter(Boolean))].sort()
   , [invoices])
@@ -173,7 +171,6 @@ export default function Dashboard() {
     }
   }
 
-  // ── Filtering logic ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = invoices
 
@@ -217,18 +214,15 @@ export default function Dashboard() {
     return result
   }, [invoices, search, statusFilter, clientFilter, datePreset, customFrom, customTo])
 
-  // ── Active filter count badge ──────────────────────────────────────────────
   const activeFilterCount = [
     statusFilter !== 'all',
     datePreset !== 'all',
     clientFilter.trim() !== '',
   ].filter(Boolean).length
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
   const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const outstanding  = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
 
-  // EmailJS quota — cycle resets on the 10th; compare dates in ET
   const emailsUsed = (() => {
     const nowET        = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' }))
     const cycleStart   = new Date(nowET.getFullYear(), nowET.getMonth(), 10)
@@ -244,7 +238,6 @@ export default function Dashboard() {
   const emailPct    = (emailsUsed / EMAIL_LIMIT) * 100
   const emailColor  = emailPct >= 95 ? 'var(--danger)' : emailPct >= 80 ? '#d97706' : 'var(--success)'
 
-  // ── Filtered stats ─────────────────────────────────────────────────────────
   const filteredRevenue     = filtered.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const filteredOutstanding = filtered.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
   const isFiltered          = activeFilterCount > 0 || search.trim() !== ''
@@ -259,20 +252,17 @@ export default function Dashboard() {
     setShowClientSug(false)
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="app-layout">
       <Navbar session={session} />
       <div className="main-content">
 
-        {/* ── Stats grid ── */}
         <div className="stats-grid">
           <StatCard label="Invoices" value={invoices.length} />
           <StatCard label="Collected" value={formatCAD(totalRevenue)} accent />
           <StatCard label="Outstanding" value={formatCAD(outstanding)} warn={outstanding > 0} />
         </div>
 
-        {/* ── EmailJS quota bar ── */}
         <div className="card" style={{ padding: '12px 16px', marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
@@ -294,7 +284,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ── Page header ── */}
         <div className="page-header">
           <h1>Invoices</h1>
           <Link to="/invoice/new" className="btn btn-primary btn-sm">
@@ -303,7 +292,6 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* ── Quick search ── */}
         <div className="form-group" style={{ marginBottom: 8 }}>
           <input
             type="search"
@@ -314,7 +302,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* ── Filter bar ── */}
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
 
@@ -368,7 +355,6 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* ── Expanded filter panel ── */}
           {filtersOpen && (
             <div className="card" style={{ marginTop: 10, padding: 16 }}>
 
@@ -494,7 +480,6 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ── Filtered stats summary ── */}
         {isFiltered && filtered.length > 0 && (
           <div style={{
             background: 'var(--blue-pale)', border: '1px solid #bfdbfe',
@@ -516,7 +501,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ── Invoice list ── */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>Loading…</div>
         ) : filtered.length === 0 ? (
@@ -535,40 +519,66 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="invoice-list">
-            {filtered.map(inv => (
-              <div
-                key={inv.id}
-                className="invoice-row"
-                onClick={() => navigate(`/invoice/${inv.id}`)}
-              >
-                <div className="invoice-row-top">
-                  <div>
-                    <div className="invoice-client">{inv.client_name}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                      <span className="invoice-number">{inv.invoice_number}</span>
-                      <span className="invoice-date">{formatDateShort(inv.service_date)}</span>
+            {filtered.map(inv => {
+              const isPaid  = inv.status === 'paid'
+              const isSent  = inv.status === 'sent'
+              const rowClass = isPaid ? ' invoice-row-paid' : isSent ? ' invoice-row-unpaid' : ''
+
+              return (
+                <div
+                  key={inv.id}
+                  className={`invoice-row${rowClass}`}
+                  onClick={() => navigate(`/invoice/${inv.id}`)}
+                >
+                  {/* Status left accent bar */}
+                  {(isPaid || isSent) && (
+                    <div className={isPaid ? 'paid-accent' : 'unpaid-accent'} />
+                  )}
+
+                  <div className="invoice-row-top">
+                    <div style={{ minWidth: 0 }}>
+                      <div className="invoice-client">{inv.client_name}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                        <span className="invoice-number">{inv.invoice_number}</span>
+                        <span className="invoice-date">{formatDateShort(inv.service_date)}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                      <div className="invoice-amount">{formatCAD(inv.total || 0)}</div>
+                      {isPaid && (
+                        <span className="paid-tag">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                          Paid
+                        </span>
+                      )}
+                      {isSent && (
+                        <span className="unpaid-tag">
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          Unpaid
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="invoice-amount">{formatCAD(inv.total || 0)}</div>
-                </div>
-                <div className="invoice-row-bottom">
-                  <span className={`badge badge-${inv.status || 'draft'}`}>
-                    {STATUS_COLORS[inv.status]?.label || 'Draft'}
-                  </span>
-                  {inv.emailed_at ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                      Emailed
+
+                  <div className="invoice-row-bottom">
+                    <span className={`badge badge-${inv.status || 'draft'}`}>
+                      {STATUS_COLORS[inv.status]?.label || 'Draft'}
                     </span>
-                  ) : (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                      Not emailed
-                    </span>
-                  )}
+                    {inv.emailed_at ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Emailed
+                      </span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        Not emailed
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
