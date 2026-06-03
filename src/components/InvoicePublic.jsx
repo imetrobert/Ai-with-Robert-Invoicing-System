@@ -35,14 +35,17 @@ export default function InvoicePublic() {
     setInvoice(data)
     setLoading(false)
 
-    await supabase.rpc('increment_invoice_view', { token })
+    // Explicitly cast token to string to match increment_invoice_view(token text) signature
+    const { error: rpcError } = await supabase.rpc('increment_invoice_view', { token: String(token) })
+    if (rpcError) console.error('View RPC error:', rpcError)
   }
 
   async function handlePDF() {
     setPdfLoading(true)
     try {
       await generateInvoicePDF(invoice)
-      await supabase.rpc('increment_invoice_pdf_download', { token })
+      const { error: rpcError } = await supabase.rpc('increment_invoice_pdf_download', { token: String(token) })
+      if (rpcError) console.error('PDF RPC error:', rpcError)
     }
     catch (e) { alert('PDF generation failed: ' + e.message) }
     setPdfLoading(false)
