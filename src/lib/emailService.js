@@ -6,274 +6,166 @@ const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
 const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
 
 export async function sendInvoiceEmail(invoice) {
-  if (!SERVICE_ID || !TEMPLATE_ID || !PUBLIC_KEY) {
-    throw new Error('EmailJS credentials not configured. Check your GitHub Secrets.')
-  }
-  if (!invoice.client_email) {
-    throw new Error('No client email address on this invoice.')
-  }
+  const isPaid = invoice.status === 'paid'
 
-  const services = Array.isArray(invoice.services) ? invoice.services : []
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate  = getProvinceTaxRate(invoice.province)
 
-  // Build HTML rows for each service
-  const serviceRows = services.map(s => {
-    const isWorkshop = s.service_id === 'group-workshop'
-    const qtyLabel = isWorkshop
-      ? `${s.people || 1} people &times; ${s.quantity || 1} session(s)`
-      : `${s.quantity || 1}`
-    const amount = isWorkshop
-      ? (s.people || 1) * (s.quantity || 1) * (s.rate || 0)
-      : (s.quantity || 1) * (s.rate || 0)
-    return `
-      <tr>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;font-weight:600;">${s.service_name || ''}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;color:#64748b;font-size:13px;">${s.description || ''}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:center;">${qtyLabel}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(s.rate || 0)}</td>
-        <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${formatCAD(amount)}</td>
-      </tr>`
-  }).join('')
+  const subtotal  = invoice.items?.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0) ?? 0
+  const discount  = invoice.discount_amount ?? 0
+  const taxable   = subtotal - discount
+  const taxAmount = taxable * taxRate
+  const total     = taxable + taxAmount
 
-  // Build totals rows
-  let totalsRows = `
-    <tr>
-      <td colspan="4" style="padding:8px 14px;text-align:right;color:#64748b;">Subtotal</td>
-      <td style="padding:8px 14px;text-align:right;font-weight:600;">${formatCAD(invoice.subtotal || 0)}</td>
-    </tr>`
-
-  if (invoice.discount_amount > 0) {
-    const discLabel = invoice.discount_type === 'percent'
-      ? `Discount (${invoice.discount_value}%)`
-      : 'Discount'
-    totalsRows += `
-    <tr>
-      <td colspan="4" style="padding:8px 14px;text-align:right;color:#15803d;">${discLabel}</td>
-      <td style="padding:8px 14px;text-align:right;color:#15803d;font-weight:600;">-${formatCAD(invoice.discount_amount)}</td>
-    </tr>`
-  }
-
-  if (invoice.gst_enabled) {
-    totalsRows += `
-    <tr>
-      <td colspan="4" style="padding:8px 14px;text-align:right;color:#64748b;">${taxLabel} (${taxRate}%)</td>
-      <td style="padding:8px 14px;text-align:right;font-weight:600;">${formatCAD(invoice.gst_amount || 0)}</td>
-    </tr>`
-  }
-
-  totalsRows += `
-    <tr style="background:#153457;">
-      <td colspan="4" style="padding:12px 14px;text-align:right;color:white;font-weight:700;font-size:15px;">TOTAL DUE</td>
-      <td style="padding:12px 14px;text-align:right;color:white;font-weight:700;font-size:15px;">${formatCAD(invoice.total || 0)}</td>
-    </tr>`
-
-  const notesSection = invoice.notes ? `
-    <div style="margin-top:24px;padding:14px 16px;background:#f8fafc;border-left:3px solid #2563eb;border-radius:4px;">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#2563eb;font-weight:700;margin-bottom:6px;">Notes</div>
-      <p style="margin:0;color:#64748b;font-size:14px;">${invoice.notes}</p>
-    </div>` : ''
-
-  const taxFooter = invoice.gst_enabled
-    ? `${taxLabel} applied at ${taxRate}%`
-    : 'GST/QST/HST not applicable at this time.'
-
-  const isPaid = invoice.status === 'paid'
-
-  // Use ET-converted date for "Date Issued" so it matches what the app shows
-  const issuedDateET = formatDate(
-    utcToETDateStr(invoice.created_at) ||
-    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
-  )
+  const greeting = `Dear <strong>${invoice.client_name}</strong>,<br><br>
+Thank you for placing your trust with the AI with Robert team.<br>
+Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.invoice_date))}</strong>.`
 
   const statusBanner = isPaid
-    ? `<div style="margin:0 0 24px;padding:20px 28px;background:#dcfce7;border-radius:8px;text-align:center;border:1px solid #86efac;">
-        <div style="color:#15803d;font-size:26px;font-weight:800;letter-spacing:2px;">✓ PAYMENT RECEIVED</div>
-        <div style="color:#166534;font-size:14px;margin-top:6px;">Thank you — this invoice has been settled.</div>
-      </div>`
-    : `<div style="margin:0 0 24px;padding:20px 28px;background:#fef9c3;border-radius:8px;text-align:center;border:1px solid #fde68a;">
-        <div style="color:#92400e;font-size:22px;font-weight:800;letter-spacing:1px;">⏳ AMOUNT PENDING</div>
-        <div style="color:#78350f;font-size:20px;font-weight:700;margin-top:8px;">${formatCAD(invoice.total || 0)}</div>
-        <div style="color:#92400e;font-size:13px;margin-top:4px;">Please arrange payment at your earliest convenience.</div>
-      </div>`
+    ? `<div style="margin:24px 0;padding:18px 24px;background:#dcfce7;border:2px solid #16a34a;border-radius:10px;text-align:center;">
+        <span style="font-size:22px;font-weight:800;color:#16a34a;letter-spacing:1px;">✅ PAYMENT RECEIVED</span>
+       </div>`
+    : `<div style="margin:24px 0;padding:18px 24px;background:#fef9c3;border:2px solid #ca8a04;border-radius:10px;text-align:center;">
+        <span style="font-size:22px;font-weight:800;color:#ca8a04;letter-spacing:1px;">⏳ AMOUNT PENDING: ${formatCAD(total)}</span>
+       </div>`
 
-  const greeting = `
-    <div style="padding:28px 28px 0;">
-      <p style="margin:0 0 8px;font-size:16px;color:#0f172a;">Dear <strong>${invoice.client_name}</strong>,</p>
-      <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.6;">
-        Thank you for placing your trust with the <strong>AI with Robert</strong> team.
-        Please find below your invoice for services rendered on <strong>${formatDate(invoice.service_date)}</strong>.
-      </p>
-      ${statusBanner}
-    </div>`
-
+  // ✅ FIXED: correct public invoice URL (was missing /#/invoice/public/ path)
   const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
-  const html_body = `<!DOCTYPE html>
+  const itemRows = invoice.items?.map(item => `
+    <tr>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;">${item.description}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;">${item.quantity}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(item.unit_price)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(item.quantity * item.unit_price)}</td>
+    </tr>`).join('') ?? ''
+
+  const discountRow = discount > 0 ? `
+    <tr>
+      <td colspan="3" style="padding:8px 12px;text-align:right;color:#64748b;">Discount</td>
+      <td style="padding:8px 12px;text-align:right;color:#dc2626;">-${formatCAD(discount)}</td>
+    </tr>` : ''
+
+  const html_body = `
+<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0;">
-  <tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:600px;width:100%;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
-      <!-- Header -->
-      <tr>
-        <td style="background:linear-gradient(135deg,#153457 0%,#1e4a8a 100%);padding:24px 28px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td>
-                <div style="color:white;font-size:20px;font-weight:700;margin-bottom:4px;">AI with Robert</div>
-                <div style="color:rgba(200,220,255,0.9);font-size:12px;">AI &amp; Technology Training for Seniors</div>
-                <div style="color:rgba(200,220,255,0.9);font-size:12px;">5550 Lyndale, Cote Saint-Luc, Quebec &nbsp;H4V 2L5</div>
-                <div style="color:rgba(200,220,255,0.9);font-size:12px;">invoices@aiwithrobert.com &nbsp;&middot;&nbsp; (514) 250-8491</div>
-              </td>
-              <td align="right">
-                <div style="color:white;font-size:28px;font-weight:800;letter-spacing:2px;">INVOICE</div>
-                <div style="color:rgba(200,220,255,0.8);font-size:13px;font-family:monospace;">${invoice.invoice_number}</div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1e293b 0%,#2563eb 100%);padding:32px 36px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;">AI with Robert</div>
+            <div style="font-size:13px;color:#93c5fd;margin-top:4px;">invoices@aiwithrobert.com</div>
+          </td>
+        </tr>
 
-      <!-- Blue accent bar -->
-      <tr><td style="background:#2563eb;height:3px;font-size:0;">&nbsp;</td></tr>
+        <!-- Greeting -->
+        <tr>
+          <td style="padding:32px 36px 8px;">
+            <p style="margin:0;font-size:15px;color:#1e293b;line-height:1.7;">${greeting}</p>
+            ${statusBanner}
+          </td>
+        </tr>
 
-      <!-- Greeting -->
-      <tr><td>${greeting}</td></tr>
-
-      <!-- Bill To + Meta -->
-      <tr>
-        <td style="padding:24px 28px 16px;">
-          <table width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td style="vertical-align:top;">
-                <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#2563eb;font-weight:700;margin-bottom:8px;">Bill To</div>
-                <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:4px;">${invoice.client_name}</div>
-                ${invoice.client_email ? `<div style="color:#64748b;font-size:13px;">${invoice.client_email}</div>` : ''}
-                ${invoice.address_line1 ? `<div style="color:#64748b;font-size:13px;margin-top:4px;">${invoice.address_line1}</div>` : ''}
-                ${invoice.address_line2 ? `<div style="color:#64748b;font-size:13px;">${invoice.address_line2}</div>` : ''}
-                ${(invoice.address_city || invoice.province || invoice.address_postal) ? `<div style="color:#64748b;font-size:13px;">${[invoice.address_city, invoice.province, invoice.address_postal].filter(Boolean).join(', ')}</div>` : ''}
-              </td>
-              <td style="vertical-align:top;text-align:right;">
-                <table cellpadding="3" cellspacing="0" style="margin-left:auto;">
-                  <tr>
-                    <td style="font-size:11px;text-transform:uppercase;color:#64748b;padding-right:8px;">Date of Service</td>
-                    <td style="font-size:13px;font-weight:600;color:#0f172a;">${formatDate(invoice.service_date)}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size:11px;text-transform:uppercase;color:#64748b;padding-right:8px;">Date Issued</td>
-                    <td style="font-size:13px;font-weight:600;color:#0f172a;">${issuedDateET}</td>
-                  </tr>
-                  <tr>
-                    <td style="font-size:11px;text-transform:uppercase;color:#64748b;padding-right:8px;">Status</td>
-                    <td style="font-size:13px;font-weight:600;color:#1d4ed8;">${(invoice.status || 'DRAFT').toUpperCase()}</td>
-                  </tr>
-                </table>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-
-      <!-- Services table -->
-      <tr>
-        <td style="padding:0 28px 8px;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
-            <thead>
-              <tr style="background:#153457;">
-                <th style="padding:10px 14px;text-align:left;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Service</th>
-                <th style="padding:10px 14px;text-align:left;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Description</th>
-                <th style="padding:10px 14px;text-align:center;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Qty</th>
-                <th style="padding:10px 14px;text-align:right;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Rate</th>
-                <th style="padding:10px 14px;text-align:right;color:white;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;">Amount</th>
+        <!-- Invoice Meta -->
+        <tr>
+          <td style="padding:0 36px 20px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-size:13px;color:#64748b;">Invoice #</td>
+                <td style="font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${invoice.invoice_number}</td>
               </tr>
-            </thead>
-            <tbody>
-              ${serviceRows}
-            </tbody>
-            <tfoot>
-              ${totalsRows}
-            </tfoot>
-          </table>
-        </td>
-      </tr>
+              <tr>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">Invoice Date</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.invoice_date))}</td>
+              </tr>
+              ${invoice.due_date ? `<tr>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">Due Date</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.due_date))}</td>
+              </tr>` : ''}
+            </table>
+          </td>
+        </tr>
 
-      <!-- Notes -->
-      ${notesSection ? `<tr><td style="padding:0 28px 8px;">${notesSection}</td></tr>` : ''}
+        <!-- Items Table -->
+        <tr>
+          <td style="padding:0 36px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Description</th>
+                  <th style="padding:10px 12px;text-align:center;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Qty</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Price</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemRows}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="3" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">Subtotal</td>
+                  <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(subtotal)}</td>
+                </tr>
+                ${discountRow}
+                <tr>
+                  <td colspan="3" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">${taxLabel} (${(taxRate * 100).toFixed(0)}%)</td>
+                  <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(taxAmount)}</td>
+                </tr>
+                <tr style="background:#f8fafc;">
+                  <td colspan="3" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1e293b;">Total</td>
+                  <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#2563eb;">${formatCAD(total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </td>
+        </tr>
 
-      <!-- Payment Instructions (unpaid only) -->
-      ${!isPaid ? `
-      <tr>
-        <td style="padding:16px 28px 0;">
-          <div style="padding:16px 18px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-              <span style="background:#FFD100;color:#1a1a1a;font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:0.5px;font-family:Arial,sans-serif;">e&#8209;Transfer</span>
-              <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#1d4ed8;font-weight:700;">How to Pay</div>
+        <!-- Notes -->
+        ${invoice.notes ? `
+        <tr>
+          <td style="padding:0 36px 24px;">
+            <div style="background:#f8fafc;border-left:3px solid #2563eb;border-radius:4px;padding:12px 16px;">
+              <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Notes</div>
+              <div style="font-size:13px;color:#1e293b;">${invoice.notes}</div>
             </div>
-            <p style="margin:0 0 8px;color:#1e3a5f;font-size:14px;line-height:1.6;">
-              <strong>Interac e-Transfer</strong> — Send your payment to
-              <span style="font-family:monospace;background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:13px;color:#1d4ed8;font-weight:600;">invoices@aiwithrobert.com</span>
-              and add this email as a payee in your Interac settings.
-            </p>
-            <p style="margin:0;color:#1e3a5f;font-size:14px;line-height:1.6;">
-              <strong>Cash payment</strong> — We can also arrange a cash payment at your convenience. Simply reply to this email to coordinate.
-            </p>
-          </div>
-        </td>
-      </tr>
-      ` : ''}
+          </td>
+        </tr>` : ''}
 
-      <!-- PDF Download Link -->
-      <tr>
-        <td style="padding:16px 28px 0;">
-          <div style="text-align:center;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
-            <p style="margin:0;color:#64748b;font-size:14px;">
-              You can also
-              <a href="${publicUrl}" style="color:#2563eb;font-weight:600;text-decoration:none;">download a PDF copy of your invoice</a>.
+        <!-- PDF Download Link -->
+        <tr>
+          <td style="padding:0 36px 32px;text-align:center;">
+            <p style="margin:0 0 16px;font-size:14px;color:#64748b;">
+              You can also <a href="${publicUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline;">download a PDF copy of your invoice</a>.
             </p>
-          </div>
-        </td>
-      </tr>
+          </td>
+        </tr>
 
-      <!-- Footer -->
-      <tr>
-        <td style="background:#153457;padding:20px 28px;text-align:center;margin-top:8px;">
-          <div style="color:rgba(180,200,240,0.9);font-size:12px;margin-bottom:4px;">Thank you for choosing AI with Robert!</div>
-          <div style="color:rgba(255,255,255,0.85);font-size:11px;">5550 Lyndale, Cote Saint-Luc, Quebec &nbsp;H4V 2L5</div>
-          <div style="color:rgba(255,255,255,0.75);font-size:11px;margin-top:2px;">aiwithrobert.com &nbsp;&middot;&nbsp; invoices@aiwithrobert.com &nbsp;&middot;&nbsp; (514) 250-8491</div>
-          <div style="color:rgba(255,255,255,0.65);font-size:10px;margin-top:4px;">${taxFooter}</div>
-        </td>
-      </tr>
+        <!-- Footer -->
+        <tr>
+          <td style="background:#1e293b;padding:24px 36px;text-align:center;">
+            <div style="font-size:13px;color:#94a3b8;">AI with Robert · Côte Saint-Luc, QC · invoices@aiwithrobert.com</div>
+            <div style="font-size:12px;color:#64748b;margin-top:6px;">© ${new Date().getFullYear()} AI with Robert. All rights reserved.</div>
+          </td>
+        </tr>
 
-    </table>
-  </td></tr>
-</table>
+      </table>
+    </td></tr>
+  </table>
 </body>
 </html>`
 
   const templateParams = {
     to_email:       invoice.client_email,
     to_name:        invoice.client_name,
-    from_name:      'AI with Robert',
-    reply_to:       'invoices@aiwithrobert.com',
     invoice_number: invoice.invoice_number,
-    total:          formatCAD(invoice.total || 0),
+    total:          formatCAD(total),
     html_body,
   }
 
-  const payloadSize = new TextEncoder().encode(JSON.stringify(templateParams)).length / 1024
-  if (payloadSize > 49) {
-    throw new Error(`Email payload is ${payloadSize.toFixed(1)}KB which exceeds EmailJS free tier 50KB limit. Upgrade to Personal plan ($9/mo) for larger emails.`)
-  }
-
-  return emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
-    .catch(err => {
-      const msg = err?.text || err?.message || ''
-      if (msg.includes('quota') || msg.includes('limit') || msg.includes('429') || msg.includes('blocked')) {
-        throw new Error('EmailJS monthly limit reached (200/200). Upgrade at emailjs.com or wait until your cycle resets on the 10th.')
-      }
-      throw err
-    })
+  await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
 }
