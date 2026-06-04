@@ -6,20 +6,22 @@ const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
 const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
 
 export async function sendInvoiceEmail(invoice) {
-  const isPaid = invoice.status === 'paid'
-
+  const isPaid   = invoice.status === 'paid'
+  const services = Array.isArray(invoice.services) ? invoice.services : []
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate  = getProvinceTaxRate(invoice.province)
 
-  const subtotal  = invoice.items?.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0) ?? 0
-  const discount  = invoice.discount_amount ?? 0
-  const taxable   = subtotal - discount
-  const taxAmount = taxable * taxRate
-  const total     = taxable + taxAmount
+  // Use pre-calculated totals stored on the invoice record
+  const subtotal       = invoice.subtotal        ?? 0
+  const discountAmount = invoice.discount_amount  ?? 0
+  const gstAmount      = invoice.gst_amount       ?? 0
+  const total          = invoice.total            ?? 0
+
+  const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
   const greeting = `Dear <strong>${invoice.client_name}</strong>,<br><br>
 Thank you for placing your trust with the AI with Robert team.<br>
-Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.invoice_date))}</strong>.`
+Please find below your invoice for <strong>${formatDate(invoice.service_date)}</strong>.`
 
   const statusBanner = isPaid
     ? `<div style="margin:24px 0;padding:18px 24px;background:#dcfce7;border:2px solid #16a34a;border-radius:10px;text-align:center;">
@@ -29,21 +31,36 @@ Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.i
         <span style="font-size:22px;font-weight:800;color:#ca8a04;letter-spacing:1px;">⏳ AMOUNT PENDING: ${formatCAD(total)}</span>
        </div>`
 
-  // ✅ FIXED: correct public invoice URL (was missing /#/invoice/public/ path)
-  const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
-
-  const itemRows = invoice.items?.map(item => `
+  const itemRows = services.map(svc => {
+    const isWorkshop = svc.service_id === 'group-workshop'
+    const qty = isWorkshop
+      ? `${svc.people || 1} ppl × ${svc.quantity || 1} session(s)`
+      : String(svc.quantity || 1)
+    const amount = isWorkshop
+      ? (svc.people || 1) * (svc.quantity || 1) * (svc.rate || 0)
+      : (svc.quantity || 1) * (svc.rate || 0)
+    return `
     <tr>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;">${item.description}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;">${item.quantity}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(item.unit_price)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(item.quantity * item.unit_price)}</td>
-    </tr>`).join('') ?? ''
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;">${svc.service_name || ''}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">${svc.description || ''}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;">${qty}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(svc.rate || 0)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${formatCAD(amount)}</td>
+    </tr>`
+  }).join('')
 
-  const discountRow = discount > 0 ? `
+  const discountRow = discountAmount > 0 ? `
     <tr>
-      <td colspan="3" style="padding:8px 12px;text-align:right;color:#64748b;">Discount</td>
-      <td style="padding:8px 12px;text-align:right;color:#dc2626;">-${formatCAD(discount)}</td>
+      <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">
+        Discount${invoice.discount_type === 'percent' ? ` (${invoice.discount_value}%)` : ''}
+      </td>
+      <td style="padding:8px 12px;text-align:right;color:#dc2626;">-${formatCAD(discountAmount)}</td>
+    </tr>` : ''
+
+  const taxRow = invoice.gst_enabled ? `
+    <tr>
+      <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">${taxLabel} (${taxRate}%)</td>
+      <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(gstAmount)}</td>
     </tr>` : ''
 
   const html_body = `
@@ -80,13 +97,13 @@ Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.i
                 <td style="font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${invoice.invoice_number}</td>
               </tr>
               <tr>
-                <td style="font-size:13px;color:#64748b;padding-top:4px;">Invoice Date</td>
-                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.invoice_date))}</td>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">Date Issued</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.created_at))}</td>
               </tr>
-              ${invoice.due_date ? `<tr>
-                <td style="font-size:13px;color:#64748b;padding-top:4px;">Due Date</td>
-                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.due_date))}</td>
-              </tr>` : ''}
+              <tr>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">Date of Service</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(invoice.service_date)}</td>
+              </tr>
             </table>
           </td>
         </tr>
@@ -97,9 +114,10 @@ Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.i
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
               <thead>
                 <tr style="background:#f8fafc;">
+                  <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Service</th>
                   <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Description</th>
                   <th style="padding:10px 12px;text-align:center;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Qty</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Price</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Rate</th>
                   <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Amount</th>
                 </tr>
               </thead>
@@ -108,16 +126,13 @@ Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.i
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="3" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">Subtotal</td>
+                  <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">Subtotal</td>
                   <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(subtotal)}</td>
                 </tr>
                 ${discountRow}
-                <tr>
-                  <td colspan="3" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">${taxLabel} (${(taxRate * 100).toFixed(0)}%)</td>
-                  <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(taxAmount)}</td>
-                </tr>
+                ${taxRow}
                 <tr style="background:#f8fafc;">
-                  <td colspan="3" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1e293b;">Total</td>
+                  <td colspan="4" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1e293b;">Total Due (CAD)</td>
                   <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#2563eb;">${formatCAD(total)}</td>
                 </tr>
               </tfoot>
@@ -125,8 +140,8 @@ Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.i
           </td>
         </tr>
 
-        <!-- Notes -->
         ${invoice.notes ? `
+        <!-- Notes -->
         <tr>
           <td style="padding:0 36px 24px;">
             <div style="background:#f8fafc;border-left:3px solid #2563eb;border-radius:4px;padding:12px 16px;">
@@ -136,11 +151,11 @@ Please find below your invoice for <strong>${formatDate(utcToETDateStr(invoice.i
           </td>
         </tr>` : ''}
 
-        <!-- PDF Download Link -->
+        <!-- PDF Link -->
         <tr>
           <td style="padding:0 36px 32px;text-align:center;">
             <p style="margin:0 0 16px;font-size:14px;color:#64748b;">
-              You can also <a href="${publicUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline;">download a PDF copy of your invoice</a>.
+              You can also <a href="${publicUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline;">view and download a PDF copy of your invoice</a>.
             </p>
           </td>
         </tr>

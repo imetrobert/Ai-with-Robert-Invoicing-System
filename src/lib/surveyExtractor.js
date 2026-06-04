@@ -1,6 +1,6 @@
 // src/lib/surveyExtractor.js
-// Uses Gemini 1.5 Flash (free tier) to extract survey fields from a PDF/image
-// Free tier: 15 req/min, 1500 req/day — more than enough for workshop volumes
+// Uses Gemini 2.5 Flash to extract survey fields from a PDF or image.
+// Free tier: 15 req/min, 1500 req/day — more than enough for workshop volumes.
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
@@ -43,7 +43,6 @@ async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
-      // Strip the data:...;base64, prefix
       const base64 = reader.result.split(',')[1]
       resolve(base64)
     }
@@ -53,12 +52,11 @@ async function fileToBase64(file) {
 }
 
 /**
- * Convert PDF to images using PDF.js, returns array of base64 PNG strings
- * Falls back to treating PDF as a single image if PDF.js unavailable
+ * Convert PDF to images using PDF.js, returns array of base64 JPEG strings.
+ * Falls back to treating PDF as a single image if PDF.js is unavailable.
  */
 async function pdfToImages(file) {
   try {
-    // Dynamically load PDF.js from CDN
     if (!window.pdfjsLib) {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script')
@@ -77,31 +75,31 @@ async function pdfToImages(file) {
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum)
-      const viewport = page.getViewport({ scale: 2.0 }) // 2x for better OCR quality
+      const viewport = page.getViewport({ scale: 2.0 }) // 2x scale for better OCR quality
       const canvas = document.createElement('canvas')
       canvas.width = viewport.width
       canvas.height = viewport.height
       const ctx = canvas.getContext('2d')
       await page.render({ canvasContext: ctx, viewport }).promise
-      // Convert to base64 JPEG (smaller than PNG, good enough for OCR)
       const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1]
       images.push(base64)
     }
 
     return images
   } catch (err) {
-    console.warn('PDF.js failed, treating as image:', err)
-    // Fallback: treat as image directly
+    console.warn('PDF.js failed, treating PDF as image:', err)
     const base64 = await fileToBase64(file)
     return [base64]
   }
 }
 
 /**
- * Main extraction function
+ * Extract survey fields from a PDF or image file using Gemini.
+ * The Gemini API key is stored in localStorage (browser-only, never sent to any server except Gemini).
+ *
  * @param {File} file - PDF or image file
  * @param {string} apiKey - Gemini API key
- * @returns {Object} extracted survey fields
+ * @returns {Object[]} array of extracted survey objects (one per detected respondent)
  */
 export async function extractSurveyFromFile(file, apiKey) {
   if (!apiKey) throw new Error('Gemini API key not configured')
@@ -114,7 +112,6 @@ export async function extractSurveyFromFile(file, apiKey) {
       inlineData: { mimeType: 'image/jpeg', data: base64 }
     }))
   } else {
-    // Image file (jpg, png, etc.)
     const base64 = await fileToBase64(file)
     imageParts = [{ inlineData: { mimeType: file.type, data: base64 } }]
   }
@@ -134,7 +131,6 @@ export async function extractSurveyFromFile(file, apiKey) {
         maxOutputTokens: 4096,
         responseMimeType: 'application/json',
       },
-      // thinkingConfig not needed for 2.0-flash-lite
     })
   })
 
@@ -149,42 +145,30 @@ export async function extractSurveyFromFile(file, apiKey) {
 
   const data = await response.json()
 
-  // gemini-2.5-flash uses "thinking" — parts can include thought + multiple text parts
-  // Concatenate ALL non-thought text parts to get the full response
+  // Gemini 2.5 Flash may return "thinking" parts alongside text parts — collect only text
   const parts = data?.candidates?.[0]?.content?.parts || []
   const text = parts
     .filter(p => p.text && !p.thought)
     .map(p => p.text)
     .join('') || parts.filter(p => p.text).map(p => p.text).join('')
 
-  // Show exactly what we got for debugging
-  const debugInfo = 'parts:' + parts.length + ' types:' + parts.map(p => p.thought ? 'thought' : 'text(' + (p.text||'').length + ')').join(',')
-
   if (!text || text.trim() === '') {
-    throw new Error('Empty text. ' + debugInfo + ' raw:' + JSON.stringify(data).substring(0, 300))
+    const debugInfo = 'parts:' + parts.length + ' types:' + parts.map(p => p.thought ? 'thought' : 'text(' + (p.text||'').length + ')').join(',')
+    throw new Error('Empty response from Gemini. ' + debugInfo + ' raw:' + JSON.stringify(data).substring(0, 300))
   }
 
-  // Strip markdown fences
   let stripped = text.replace(/```json|```/g, '').trim()
 
-  // Show length in all errors
-  const rawPreview = 'len=' + stripped.length + ' ' + stripped.substring(0, 200)
-
-  // Handle both array [{...}] and object {...} responses
   const firstBrace = Math.min(
     stripped.indexOf('{') === -1 ? Infinity : stripped.indexOf('{'),
     stripped.indexOf('[') === -1 ? Infinity : stripped.indexOf('[')
   )
-  const isArray = stripped.indexOf('[') !== -1 && 
-    (stripped.indexOf('{') === -1 || stripped.indexOf('[') < stripped.indexOf('{'))
-  const lastBrace = stripped.lastIndexOf('}')
 
-  if (firstBrace === -1) {
-    throw new Error('No JSON found. ' + rawPreview)
+  if (firstBrace === Infinity) {
+    throw new Error('No JSON found in response. Preview: ' + stripped.substring(0, 200))
   }
 
-  // Try progressively from lastBrace backwards until we get valid JSON
-  // This handles cases where } appears inside string values
+  // Walk backwards from end to find the last valid closing brace (handles } inside strings)
   let parsed = null
   let lastPos = stripped.length - 1
   while (lastPos > firstBrace) {
@@ -192,28 +176,25 @@ export async function extractSurveyFromFile(file, apiKey) {
     if (pos <= firstBrace) break
     try {
       parsed = JSON.parse(stripped.substring(firstBrace, pos + 1))
-      break // success
+      break
     } catch {
-      lastPos = pos - 1 // try the next } going backwards
+      lastPos = pos - 1
     }
   }
 
   if (!parsed) {
-    // Last resort: try fixing trailing commas and incomplete JSON
+    // Last resort: fix truncated JSON by closing unclosed braces and removing trailing commas
     try {
-      // Add missing closing braces if truncated
       let attempt = stripped.substring(firstBrace)
-      const opens = (attempt.match(/\{/g) || []).length
+      const opens  = (attempt.match(/\{/g) || []).length
       const closes = (attempt.match(/\}/g) || []).length
       attempt += '}'.repeat(Math.max(0, opens - closes))
-      attempt = attempt.replace(/,\s*([}\]])/g, '$1') // remove trailing commas
-      parsed = JSON.parse(attempt)
+      attempt  = attempt.replace(/,\s*([}\]])/g, '$1')
+      parsed   = JSON.parse(attempt)
     } catch {
-      throw new Error('Could not parse JSON — raw (' + stripped.length + ' chars): ' + stripped.substring(0, 400))
+      throw new Error('Could not parse Gemini JSON (' + stripped.length + ' chars): ' + stripped.substring(0, 400))
     }
   }
 
-  // Always return an array of surveys
-  if (Array.isArray(parsed)) return parsed
-  return [parsed]
+  return Array.isArray(parsed) ? parsed : [parsed]
 }
