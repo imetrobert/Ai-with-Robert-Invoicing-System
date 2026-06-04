@@ -56,5 +56,3 @@ export const SERVICES = [
     unitLabel: '',
   },
 ]
-
-export const getServiceById = (id) => SERVICES.find(s => s.id === id)
