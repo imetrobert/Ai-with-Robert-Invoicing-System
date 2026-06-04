@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { formatCAD, formatDate, utcToETDateStr } from './invoiceUtils'
+import { formatCAD, formatDate, utcToETDateStr, getProvinceTaxLabel, getProvinceTaxRate } from './invoiceUtils'
 
 const BRAND = {
   navy:      [21, 52, 95],
@@ -16,46 +16,22 @@ const BRAND = {
 
 async function fetchLogoFull() {
   try {
-    const res = await fetch('https://aiwithrobert.com/logo.PNG')
+    const res  = await fetch('https://aiwithrobert.com/logo.PNG')
     const blob = await res.blob()
     return await blobToBase64(blob)
   } catch (_) { return null }
-}
-
-async function fetchLogoCompressed() {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = 60
-        canvas.height = 60
-        const ctx = canvas.getContext('2d')
-        ctx.fillStyle = '#153457'
-        ctx.fillRect(0, 0, 60, 60)
-        const scale = Math.min(60 / img.width, 60 / img.height)
-        const w = img.width * scale
-        const h = img.height * scale
-        ctx.drawImage(img, (60 - w) / 2, (60 - h) / 2, w, h)
-        resolve(canvas.toDataURL('image/jpeg', 0.35))
-      } catch (_) { resolve(null) }
-    }
-    img.onerror = () => resolve(null)
-    img.src = 'https://aiwithrobert.com/logo.PNG'
-  })
 }
 
 function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onloadend = () => resolve(reader.result)
-    reader.onerror = reject
+    reader.onerror   = reject
     reader.readAsDataURL(blob)
   })
 }
 
-// ── Shared PDF skeleton ──────────────────────────────────────────────────────
+// ── PDF skeleton ──────────────────────────────────────────────────────────────
 
 function createDoc() {
   return new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
@@ -97,34 +73,12 @@ function drawBody(doc, invoice, margin, pageW) {
   _drawFooter(doc, invoice, doc.internal.pageSize.getHeight(), margin, pageW)
 }
 
-// ── Full branded PDF (download) ──────────────────────────────────────────────
-async function buildPDF(invoice) {
-  const doc = createDoc()
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 20
-  const logoData = await fetchLogoFull()
-  drawHeader(doc, pageW, margin, logoData)
-  drawBody(doc, invoice, margin, pageW)
-  return doc
-}
+// ── Drawing helpers ───────────────────────────────────────────────────────────
 
-// ── Email PDF — compressed logo, stays under 50KB ────────────────────────────
-async function buildEmailPDF(invoice) {
-  const doc = createDoc()
-  const pageW = doc.internal.pageSize.getWidth()
-  const margin = 20
-  const logoData = await fetchLogoCompressed()
-  drawHeader(doc, pageW, margin, logoData)
-  drawBody(doc, invoice, margin, pageW)
-  return doc
-}
-
-// ── Shared drawing helpers ───────────────────────────────────────────────────
 function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   const col1 = pageW - margin - 80
   const col2 = col1 + 36
 
-  // Use ET-converted date for "Date Issued" so the PDF matches the app
   const issuedDateET = formatDate(
     utcToETDateStr(invoice.created_at) ||
     new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
@@ -168,24 +122,12 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   doc.setTextColor(...BRAND.gray)
   let addressY = billY + 9 + (nameLines.length * 6)
 
-  if (invoice.client_email) {
-    doc.text(invoice.client_email, margin, addressY)
-    addressY += 6
-  }
-  if (invoice.address_line1) {
-    doc.text(invoice.address_line1, margin, addressY)
-    addressY += 6
-  }
-  if (invoice.address_line2) {
-    doc.text(invoice.address_line2, margin, addressY)
-    addressY += 6
-  }
+  if (invoice.client_email)  { doc.text(invoice.client_email,  margin, addressY); addressY += 6 }
+  if (invoice.address_line1) { doc.text(invoice.address_line1, margin, addressY); addressY += 6 }
+  if (invoice.address_line2) { doc.text(invoice.address_line2, margin, addressY); addressY += 6 }
   const cityLine = [invoice.address_city, invoice.province, invoice.address_postal].filter(Boolean).join(', ')
-  if (cityLine) {
-    doc.text(cityLine, margin, addressY)
-  } else if (invoice.province) {
-    doc.text(invoice.province, margin, addressY)
-  }
+  if (cityLine)             { doc.text(cityLine,              margin, addressY) }
+  else if (invoice.province){ doc.text(invoice.province,      margin, addressY) }
 }
 
 function _drawServicesTable(doc, invoice, margin, startY = 96) {
@@ -196,7 +138,7 @@ function _drawServicesTable(doc, invoice, margin, startY = 96) {
     head: [['Service', 'Description', 'Qty / People', 'Rate', 'Amount']],
     body: services.map(item => {
       const isWorkshop = item.service_id === 'group-workshop'
-      const qtyLabel = isWorkshop
+      const qtyLabel   = isWorkshop
         ? `${item.people || 1} ppl x ${item.quantity || 1} session(s)`
         : String(item.quantity || 1)
       const amount = isWorkshop
@@ -223,6 +165,7 @@ function _drawTotals(doc, invoice, margin, pageW) {
   const totalsX = pageW - margin - 70
   const totalsW = 70
   const rowCount = 1 + (invoice.discount_amount > 0 ? 1 : 0) + (invoice.gst_enabled ? 1 : 0)
+
   doc.setFillColor(...BRAND.white)
   doc.roundedRect(totalsX, totalsY, totalsW, rowCount * 8 + 14, 3, 3, 'F')
 
@@ -241,12 +184,15 @@ function _drawTotals(doc, invoice, margin, pageW) {
 
   addRow('Subtotal', invoice.subtotal || 0)
   if (invoice.discount_amount > 0) {
-    const label = invoice.discount_type === 'percent' ? `Discount (${invoice.discount_value}%)` : 'Discount'
+    const label = invoice.discount_type === 'percent'
+      ? `Discount (${invoice.discount_value}%)`
+      : 'Discount'
     addRow(label, -Math.abs(invoice.discount_amount || 0), [22, 163, 74])
   }
   if (invoice.gst_enabled) {
-    const taxLabel = getTaxLabel(invoice.province)
-    addRow(`${taxLabel} (${getTaxRate(invoice.province)}%)`, invoice.gst_amount || 0)
+    const taxLabel = getProvinceTaxLabel(invoice.province)
+    const taxRate  = getProvinceTaxRate(invoice.province)
+    addRow(`${taxLabel} (${taxRate}%)`, invoice.gst_amount || 0)
   }
 
   doc.setDrawColor(...BRAND.lightBlue)
@@ -277,47 +223,35 @@ function _drawNotes(doc, invoice, margin, pageW) {
 }
 
 function _drawFooter(doc, invoice, pageH, margin, pageW) {
-  const footY = pageH - 20
+  const footY    = pageH - 20
+  const taxLabel = getProvinceTaxLabel(invoice.province)
+  const taxRate  = getProvinceTaxRate(invoice.province)
+
   doc.setFillColor(...BRAND.navy)
   doc.rect(0, footY, pageW, 20, 'F')
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
   doc.setTextColor(180, 200, 240)
-  doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 5, { align: 'center' })
+  doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 5,  { align: 'center' })
   doc.text('5550 Lyndale, Cote Saint-Luc, Quebec  H4V 2L5', pageW / 2, footY + 10, { align: 'center' })
   doc.text('aiwithrobert.com  ·  invoices@aiwithrobert.com  ·  (514) 250-8491', pageW / 2, footY + 15, { align: 'center' })
   doc.setTextColor(150, 170, 210)
   doc.setFontSize(6.5)
   const taxNote = invoice.gst_enabled
-    ? `${getTaxLabel(invoice.province)} applied at ${getTaxRate(invoice.province)}%`
+    ? `${taxLabel} applied at ${taxRate}%`
     : 'GST/QST/HST not applicable at this time.'
   doc.text(taxNote, margin, footY + 10)
 }
 
-// ── Tax helpers ──────────────────────────────────────────────────────────────
-export function getTaxLabel(province) {
-  const p = (province || '').toUpperCase()
-  if (['ON', 'NB', 'NS', 'NL', 'PE'].includes(p)) return 'HST'
-  if (p === 'QC') return 'GST + QST'
-  return 'GST'
-}
+// ── Public export ─────────────────────────────────────────────────────────────
 
-export function getTaxRate(province) {
-  const p = (province || '').toUpperCase()
-  if (p === 'ON') return 13
-  if (['NB', 'NS', 'NL', 'PE'].includes(p)) return 15
-  if (p === 'QC') return 14.975
-  return 5
-}
-
-// ── Public exports ───────────────────────────────────────────────────────────
 export async function generateInvoicePDF(invoice) {
-  const doc = await buildPDF(invoice)
+  const doc      = createDoc()
+  const pageW    = doc.internal.pageSize.getWidth()
+  const margin   = 20
+  const logoData = await fetchLogoFull()
+  drawHeader(doc, pageW, margin, logoData)
+  drawBody(doc, invoice, margin, pageW)
   const filename = `Invoice-${invoice.invoice_number}-${invoice.client_name?.replace(/\s+/g, '-')}.pdf`
   doc.save(filename)
-}
-
-export async function generateInvoicePDFBase64(invoice) {
-  const doc = await buildEmailPDF(invoice)
-  return doc.output('datauristring')
 }
