@@ -27,7 +27,6 @@ function NumInput({ value, onChange, min = '0', step = '1', style = {}, label })
   )
 }
 
-// ── Generic autocomplete field ────────────────────────────────────────────────
 function AutocompleteField({
   label, value, onChange, suggestions, onSelect,
   placeholder, type = 'text', required = false, inputRef,
@@ -125,9 +124,7 @@ export default function InvoiceForm() {
   const [notes, setNotes] = useState('')
   const [status, setStatus] = useState('draft')
 
-  // ── All past client records for autocomplete ──────────────────────────────
-  const [allClients, setAllClients] = useState([]) // full invoice rows
-  // Derived suggestion lists (unique values)
+  const [allClients, setAllClients] = useState([])
   const [nameSuggestions, setNameSuggestions]     = useState([])
   const [emailSuggestions, setEmailSuggestions]   = useState([])
   const [addr1Suggestions, setAddr1Suggestions]   = useState([])
@@ -154,7 +151,6 @@ export default function InvoiceForm() {
     if (!data) return
     setAllClients(data)
 
-    // Build unique suggestion lists preserving most-recent order
     const unique = (arr) => [...new Set(arr.filter(Boolean))]
     setNameSuggestions(unique(data.map(r => r.client_name)))
     setEmailSuggestions(unique(data.map(r => r.client_email)))
@@ -193,15 +189,11 @@ export default function InvoiceForm() {
     setLoading(false)
   }
 
-  // When a client name is selected, pre-fill only if there's exactly one
-  // unique address+email combination for that contact across all invoices.
   function handleClientSelect(name) {
     setClientName(name)
-
     const matches = allClients.filter(r => r.client_name === name)
     if (!matches.length) return
 
-    // Build a fingerprint of address+email for each invoice for this contact
     const fingerprint = r =>
       [r.client_email, r.address_line1, r.address_line2, r.address_city, r.address_postal, r.province]
         .map(v => (v || '').trim().toLowerCase())
@@ -209,18 +201,15 @@ export default function InvoiceForm() {
 
     const unique = [...new Map(matches.map(r => [fingerprint(r), r])).values()]
 
-    // Only auto-fill if every invoice for this contact has the same combination
     if (unique.length === 1) {
       const c = unique[0]
-      if (c.client_email)    setClientEmail(c.client_email)
-      if (c.address_line1)   setAddressLine1(c.address_line1)
+      if (c.client_email)   setClientEmail(c.client_email)
+      if (c.address_line1)  setAddressLine1(c.address_line1)
       setAddressLine2(c.address_line2 || '')
-      if (c.address_city)    setAddressCity(c.address_city)
-      if (c.address_postal)  setAddressPostal(c.address_postal)
-      if (c.province)        setProvince(c.province)
+      if (c.address_city)   setAddressCity(c.address_city)
+      if (c.address_postal) setAddressPostal(c.address_postal)
+      if (c.province)       setProvince(c.province)
     }
-    // If multiple distinct combinations exist, leave all address fields blank
-    // so the user fills them in intentionally
   }
 
   function handleServiceSelect(idx, serviceId) {
@@ -318,7 +307,6 @@ export default function InvoiceForm() {
                 </div>
               </div>
 
-              {/* Client Name — selecting auto-fills all address fields */}
               <AutocompleteField
                 label="Client Name"
                 required
@@ -344,7 +332,6 @@ export default function InvoiceForm() {
                 <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
               </div>
 
-              {/* Address section */}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--blue)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 12 }}>
                   Client Address <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', fontSize: 12 }}>(optional — selecting a client name above auto-fills these)</span>
@@ -422,7 +409,8 @@ export default function InvoiceForm() {
                       <input className="form-control" value={item.description} onChange={e => updateLine(idx, 'description', e.target.value)} placeholder="Add detail…" />
                     </div>
 
-                    <div className="line-item-fields">
+                    {/* Fix: was className="line-item-fields" which doesn't exist in CSS — correct class is line-item-inputs */}
+                    <div className="line-item-inputs">
                       {item.service_id === 'group-workshop' ? (
                         <>
                           <NumInput label="People" value={item.people} min="1" step="1" style={{ width: 80 }}
@@ -446,12 +434,13 @@ export default function InvoiceForm() {
                       </button>
                     </div>
 
+                    {/* Fix: was className="line-item-amount" which has no CSS rule — use inline style */}
                     {lineTotal(item) > 0 && (
-                      <div className="line-item-amount">
+                      <div style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'right', marginTop: 4 }}>
                         {item.service_id === 'group-workshop'
                           ? `${item.people || 1} × ${item.quantity || 1} × ${formatCAD(item.rate || 0)} = `
                           : `${item.quantity || 1} × ${formatCAD(item.rate || 0)} = `}
-                        <strong>{formatCAD(lineTotal(item))}</strong>
+                        <strong style={{ color: 'var(--navy)' }}>{formatCAD(lineTotal(item))}</strong>
                       </div>
                     )}
                   </div>
@@ -464,7 +453,7 @@ export default function InvoiceForm() {
             </div>
           </div>
 
-          {/* Tax & Totals */}
+          {/* Discount & Totals */}
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="card-header"><h2>Discount & Totals</h2></div>
             <div className="card-body">
@@ -515,7 +504,6 @@ export default function InvoiceForm() {
                   onChange={e => setNotes(e.target.value)}
                   placeholder="e.g. Referral discount applied. Thanks for your business!"
                 />
-                {/* Notes suggestions shown as a dropdown when focused and matching */}
                 <NotesSuggest
                   value={notes}
                   suggestions={notesSuggestions}
@@ -544,7 +532,6 @@ export default function InvoiceForm() {
   )
 }
 
-// Separate notes suggest to handle textarea (not an input)
 function NotesSuggest({ value, suggestions, onSelect }) {
   const [show, setShow] = useState(false)
   const [filtered, setFiltered] = useState([])
