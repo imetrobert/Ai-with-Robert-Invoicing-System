@@ -1,6 +1,6 @@
 // src/components/SurveyDashboard.jsx
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 
@@ -68,7 +68,6 @@ export default function SurveyDashboard() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showDeleteId, setShowDeleteId] = useState(null)
-  const navigate = useNavigate()
 
   useEffect(() => { fetchResponses() }, [])
 
@@ -98,7 +97,6 @@ export default function SurveyDashboard() {
 
   const newsletterCount = responses.filter(r => r.wants_newsletter && r.email).length
 
-  // Top topics stats
   const topicCounts = useMemo(() => {
     const counts = {}
     responses.forEach(r => (r.topics || []).forEach(t => { counts[t] = (counts[t] || 0) + 1 }))
@@ -118,7 +116,6 @@ export default function SurveyDashboard() {
           </Link>
         </div>
 
-        {/* Stats */}
         <div className="stats-grid" style={{ marginBottom: 16 }}>
           <div className="card" style={{ padding: '12px 14px' }}>
             <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 3 }}>Total Responses</div>
@@ -136,7 +133,6 @@ export default function SurveyDashboard() {
           </div>
         </div>
 
-        {/* Top topics bar */}
         {topicCounts.length > 0 && (
           <div className="card" style={{ padding: '14px 16px', marginBottom: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--muted)', marginBottom: 10 }}>
@@ -156,7 +152,6 @@ export default function SurveyDashboard() {
           </div>
         )}
 
-        {/* Export buttons */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           <button className="btn btn-ghost btn-sm" onClick={() => exportEmailList(responses)} disabled={newsletterCount === 0}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -168,13 +163,11 @@ export default function SurveyDashboard() {
           </button>
         </div>
 
-        {/* Search */}
         <div className="form-group" style={{ marginBottom: 12 }}>
           <input type="search" className="form-control" placeholder="Search by name, email, or phone…"
             value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
-        {/* List */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--muted)' }}>Loading…</div>
         ) : filtered.length === 0 ? (
@@ -233,7 +226,6 @@ export default function SurveyDashboard() {
         )}
       </div>
 
-      {/* Delete modal */}
       {showDeleteId && (
         <div className="modal-overlay" onClick={() => setShowDeleteId(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
