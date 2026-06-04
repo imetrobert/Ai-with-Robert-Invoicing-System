@@ -91,7 +91,6 @@ export default function InvoiceView() {
       <Navbar session={session} />
       <div className="main-content invoice-view">
 
-        {/* Back + title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
           <Link to="/" className="btn btn-ghost btn-sm">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
@@ -114,7 +113,6 @@ export default function InvoiceView() {
           </span>
         </div>
 
-        {/* Action buttons */}
         <div className="invoice-actions">
           <Link to={`/invoice/${id}/edit`} className="btn btn-ghost btn-sm">Edit</Link>
           <button className="btn btn-primary btn-sm" onClick={handlePDF} disabled={pdfLoading}>
@@ -132,7 +130,6 @@ export default function InvoiceView() {
           <div className={`alert alert-${emailMsg.type === 'success' ? 'success' : 'error'}`}>{emailMsg.text}</div>
         )}
 
-        {/* Invoice card */}
         <div className="card">
           <div style={{ background: 'linear-gradient(135deg, var(--navy) 0%, #1e4a8a 100%)', padding: '20px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -231,7 +228,6 @@ export default function InvoiceView() {
           </div>
         </div>
 
-        {/* Status changer */}
         <div className="card" style={{ marginTop: 12, padding: '12px 16px' }}>
           <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600, marginBottom: 8 }}>Mark as:</div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -246,7 +242,6 @@ export default function InvoiceView() {
         </div>
       </div>
 
-      {/* Resend confirmation modal */}
       {showResendModal && (
         <div className="modal-overlay" onClick={() => setShowResendModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>

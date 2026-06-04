@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { formatCAD, formatDateShort, formatDate, STATUS_COLORS, utcToETDateStr } from '../lib/invoiceUtils'
+import { formatCAD, formatDateShort, STATUS_COLORS, utcToETDateStr } from '../lib/invoiceUtils'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ function getPresetRange(preset) {
   }
 }
 
-// ─── CSV export ──────────────────────────────────────────────────────────────
+// ─── CSV export ───────────────────────────────────────────────────────────────
 
 function escapeCSV(val) {
   if (val === null || val === undefined) return ''
@@ -530,7 +530,6 @@ export default function Dashboard() {
                   className={`invoice-row${rowClass}`}
                   onClick={() => navigate(`/invoice/${inv.id}`)}
                 >
-                  {/* Status left accent bar */}
                   {(isPaid || isSent) && (
                     <div className={isPaid ? 'paid-accent' : 'unpaid-accent'} />
                   )}
