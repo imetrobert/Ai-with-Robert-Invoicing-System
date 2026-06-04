@@ -137,7 +137,6 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
   border-radius: 10px; padding: 12px;
   display: flex; flex-direction: column; gap: 10px;
 }
-.line-item-service { width: 100%; }
 .line-item-inputs { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 
 /* ── Stats cards ── */
@@ -260,25 +259,12 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .page-header {
   display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;
 }
-.page-header-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.page-header-right { display: flex; gap: 6px; flex-wrap: wrap; }
 @media (min-width: 580px) {
   .page-header { flex-direction: row; align-items: center; justify-content: space-between; margin-bottom: 22px; }
 }
 .page-header h1 { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--navy); }
 
 /* ── Totals ── */
-.invoice-totals-section {
-  display: flex; flex-direction: column; gap: 16px;
-}
-@media (min-width: 580px) {
-  .invoice-totals-section { flex-direction: row; justify-content: space-between; align-items: flex-start; }
-  .invoice-notes-col { flex: 1; max-width: 340px; }
-  .invoice-totals-col { min-width: 240px; }
-}
-.invoice-notes-col { width: 100%; }
-.invoice-totals-col { width: 100%; }
-
 .invoice-totals { width: 100%; }
 .totals-row {
   display: flex; justify-content: space-between;
@@ -313,24 +299,6 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--bg); }
 
-/* ── Tax & totals card on form ── */
-.tax-totals-grid {
-  display: flex; flex-direction: column; gap: 16px;
-}
-@media (min-width: 520px) {
-  .tax-totals-grid { flex-direction: row; gap: 24px; }
-  .tax-totals-left { flex: 1; }
-  .tax-totals-right { min-width: 200px; }
-}
-
-/* ── Bill to grid ── */
-.bill-to-grid {
-  display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;
-}
-@media (min-width: 520px) {
-  .bill-to-grid { flex-direction: row; justify-content: space-between; }
-}
-
 /* ── Empty state ── */
 .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
 .empty-state svg { opacity: .3; margin-bottom: 14px; }
@@ -358,11 +326,6 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
-/* ── Discount ── */
-.discount-type-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-.tab-btn { padding: 5px 14px; border-radius: 20px; border: 1.5px solid var(--border); background: white; font-size: 13px; cursor: pointer; transition: all .15s; }
-.tab-btn.active { background: var(--blue); color: white; border-color: var(--blue); }
-
 /* ── GST toggle ── */
 .toggle-row {
   display: flex; align-items: flex-start; gap: 10px;
@@ -382,9 +345,6 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .autocomplete-item { padding: 12px 13px; cursor: pointer; font-size: 15px; border-bottom: 1px solid var(--border); }
 .autocomplete-item:last-child { border-bottom: none; }
 .autocomplete-item:hover { background: var(--blue-pale); color: var(--blue); }
-
-/* ── Status bar ── */
-.status-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; }
 
 /* ── Form totals ── */
 .form-totals {
