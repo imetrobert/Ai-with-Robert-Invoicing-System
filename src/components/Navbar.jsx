@@ -32,6 +32,12 @@ export default function Navbar({ session }) {
           Surveys
         </Link>
         <Link
+          to="/tax-summary"
+          style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
+        >
+          Tax Summary
+        </Link>
+        <Link
           to="/"
           style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
         >
