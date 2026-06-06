@@ -8,6 +8,7 @@ import InvoiceView from './components/InvoiceView'
 import InvoicePublic from './components/InvoicePublic'
 import SurveyDashboard from './components/SurveyDashboard'
 import SurveyUpload from './components/SurveyUpload'
+import TaxSummary from './components/TaxSummary'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -43,6 +44,7 @@ export default function App() {
         <Route path="/invoice/public/:token" element={<InvoicePublic />} />
         <Route path="/surveys"         element={session ? <SurveyDashboard /> : <Navigate to="/login" replace />} />
         <Route path="/surveys/upload"  element={session ? <SurveyUpload />   : <Navigate to="/login" replace />} />
+        <Route path="/tax-summary"     element={session ? <TaxSummary session={session} /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
