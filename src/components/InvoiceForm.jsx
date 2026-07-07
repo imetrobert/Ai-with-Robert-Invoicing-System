@@ -194,22 +194,16 @@ export default function InvoiceForm() {
     const matches = allClients.filter(r => r.client_name === name)
     if (!matches.length) return
 
-    const fingerprint = r =>
-      [r.client_email, r.address_line1, r.address_line2, r.address_city, r.address_postal, r.province]
-        .map(v => (v || '').trim().toLowerCase())
-        .join('|')
-
-    const unique = [...new Map(matches.map(r => [fingerprint(r), r])).values()]
-
-    if (unique.length === 1) {
-      const c = unique[0]
-      if (c.client_email)   setClientEmail(c.client_email)
-      if (c.address_line1)  setAddressLine1(c.address_line1)
-      setAddressLine2(c.address_line2 || '')
-      if (c.address_city)   setAddressCity(c.address_city)
-      if (c.address_postal) setAddressPostal(c.address_postal)
-      if (c.province)       setProvince(c.province)
-    }
+    // allClients is fetched ordered by created_at descending, so matches[0]
+    // is this client's most recent invoice — use it as the source of truth
+    // for auto-fill instead of requiring every past invoice to match exactly.
+    const c = matches[0]
+    if (c.client_email)   setClientEmail(c.client_email)
+    if (c.address_line1)  setAddressLine1(c.address_line1)
+    setAddressLine2(c.address_line2 || '')
+    if (c.address_city)   setAddressCity(c.address_city)
+    if (c.address_postal) setAddressPostal(c.address_postal)
+    if (c.province)       setProvince(c.province)
   }
 
   function handleServiceSelect(idx, serviceId) {
