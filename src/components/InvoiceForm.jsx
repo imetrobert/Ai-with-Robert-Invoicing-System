@@ -306,7 +306,7 @@ export default function InvoiceForm() {
                 required
                 inputRef={clientInputRef}
                 value={clientName}
-                onChange={setClientName}
+                onChange={handleClientSelect}
                 onSelect={handleClientSelect}
                 suggestions={nameSuggestions}
                 placeholder="e.g. Marie Tremblay"
