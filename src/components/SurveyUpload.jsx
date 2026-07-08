@@ -3,7 +3,7 @@ import { useState, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { extractSurveyFromFile } from '../lib/surveyExtractor'
+import { extractSurveyFromFiles } from '../lib/surveyExtractor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -106,12 +106,14 @@ function CheckGroup({ label, name, value = [], onChange, options }) {
 export default function SurveyUpload() {
   const navigate = useNavigate()
   const fileInputRef = useRef(null)
+  const secondFileInputRef = useRef(null)
 
-  const [stage, setStage] = useState('upload') // 'upload' | 'extracting' | 'review' | 'saving'
+  const [stage, setStage] = useState('upload') // 'upload' | 'staged' | 'extracting' | 'review' | 'saving'
   const [surveys, setSurveys] = useState([]) // all extracted surveys
   const [surveyIndex, setSurveyIndex] = useState(0) // which one we're reviewing
   const [extractLog, setExtractLog] = useState('')
   const [fileName, setFileName] = useState('')
+  const [stagedFiles, setStagedFiles] = useState([]) // 1-2 files waiting to be consolidated & extracted
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
   const [apiKey] = useState(() => localStorage.getItem('gemini_api_key') || '')
@@ -121,19 +123,49 @@ export default function SurveyUpload() {
   // ── File drop handling ────────────────────────────────────────────────────
   const [dragOver, setDragOver] = useState(false)
 
-  async function handleFile(file) {
-    if (!file) return
+  // Called when the primary drop zone / file picker receives file(s).
+  // Accepts 1 or 2 files at once (e.g. selecting both photos together from the iOS photo picker).
+  function stageFiles(fileList) {
+    if (!fileList || fileList.length === 0) return
     const key = localStorage.getItem('gemini_api_key')
     if (!key) { setShowKeySetup(true); return }
 
-    setFileName(file.name)
+    const incoming = Array.from(fileList).slice(0, 2)
+    setStagedFiles(incoming)
+    setError('')
+    setStage('staged')
+  }
+
+  // Called from the "+ Add second photo" slot once a first file is already staged.
+  function addSecondFile(file) {
+    if (!file) return
+    setStagedFiles(prev => [prev[0], file].filter(Boolean).slice(0, 2))
+  }
+
+  function removeStagedFile(index) {
+    setStagedFiles(prev => {
+      const next = prev.filter((_, i) => i !== index)
+      if (next.length === 0) setStage('upload')
+      return next
+    })
+  }
+
+  async function runExtraction() {
+    if (stagedFiles.length === 0) return
+    const key = localStorage.getItem('gemini_api_key')
+    if (!key) { setShowKeySetup(true); return }
+
+    const combinedName = stagedFiles.map(f => f.name).join(' + ')
+    setFileName(combinedName)
     setStage('extracting')
-    setExtractLog('Reading file…')
+    setExtractLog(stagedFiles.length > 1 ? 'Reading files…' : 'Reading file…')
     setError('')
 
     try {
-      setExtractLog('Sending to Gemini for analysis…')
-      const extractedArray = await extractSurveyFromFile(file, key)
+      setExtractLog(stagedFiles.length > 1
+        ? 'Sending both photos to Gemini to consolidate…'
+        : 'Sending to Gemini for analysis…')
+      const extractedArray = await extractSurveyFromFiles(stagedFiles, key)
       const count = extractedArray.length
       setExtractLog(`Extraction complete — found ${count} survey${count > 1 ? 's' : ''}. Please review.`)
 
@@ -143,24 +175,24 @@ export default function SurveyUpload() {
         ...Object.fromEntries(
           Object.entries(extracted).map(([k, v]) => [k, v ?? EMPTY_FORM[k] ?? ''])
         ),
-        source_pdf_name: file.name,
+        source_pdf_name: combinedName,
         workshop_date: new Date().toISOString().split('T')[0],
       }))
 
       setSurveys(merged)
       setSurveyIndex(0)
       setFormData(merged[0])
+      setStagedFiles([])
       setStage('review')
     } catch (err) {
       setError(err.message)
-      setStage('upload')
+      setStage('staged')
     }
   }
 
   function onDrop(e) {
     e.preventDefault(); setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    stageFiles(e.dataTransfer.files)
   }
 
   // ── Form field helpers ────────────────────────────────────────────────────
@@ -270,17 +302,74 @@ export default function SurveyUpload() {
               Drop survey PDF or photo here
             </div>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
-              Accepts PDF, JPG, PNG — Gemini will extract all fields automatically
+              Accepts PDF, JPG, PNG — Gemini will extract all fields automatically.<br />
+              Form on 2 photos (front &amp; back)? Select both at once, or add the second after.
             </div>
             <button className="btn btn-primary" onClick={e => { e.stopPropagation(); fileInputRef.current?.click() }}>
-              Choose File
+              Choose File(s)
             </button>
             <input
               ref={fileInputRef} type="file"
               accept=".pdf,.jpg,.jpeg,.png"
+              multiple
               style={{ display: 'none' }}
-              onChange={e => handleFile(e.target.files[0])}
+              onChange={e => stageFiles(e.target.files)}
             />
+          </div>
+        )}
+
+        {/* ── Staged Files — confirm / add second photo / extract ── */}
+        {stage === 'staged' && !showKeySetup && (
+          <div className="card" style={{ padding: 20, marginBottom: 16 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--navy)', marginBottom: 12 }}>
+              📎 Ready to consolidate
+            </div>
+
+            {stagedFiles.map((f, i) => (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 8, border: '1.5px solid var(--border)',
+                marginBottom: 10, background: 'var(--bg)',
+              }}>
+                <span style={{ fontSize: 13 }}>
+                  {i === 0 ? '1️⃣' : '2️⃣'} {f.name}
+                </span>
+                <button className="btn btn-ghost btn-sm" onClick={() => removeStagedFile(i)}>✕ Remove</button>
+              </div>
+            ))}
+
+            {stagedFiles.length < 2 && (
+              <>
+                <button
+                  className="btn btn-ghost"
+                  style={{ width: '100%', marginBottom: 12, border: '1.5px dashed var(--border)' }}
+                  onClick={() => secondFileInputRef.current?.click()}
+                >
+                  + Add second photo (optional — e.g. back of form)
+                </button>
+                <input
+                  ref={secondFileInputRef} type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  style={{ display: 'none' }}
+                  onChange={e => addSecondFile(e.target.files[0])}
+                />
+              </>
+            )}
+
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>
+              {stagedFiles.length > 1
+                ? 'Both photos will be sent together and consolidated into a single survey.'
+                : '1 file is enough to extract — add a second only if the form spans two separate photos.'}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-ghost" onClick={() => { setStagedFiles([]); setStage('upload'); setError('') }}>
+                ← Start Over
+              </button>
+              <button className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={runExtraction}>
+                {stagedFiles.length > 1 ? 'Consolidate & Extract' : 'Extract Survey Data'}
+              </button>
+            </div>
           </div>
         )}
 
