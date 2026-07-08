@@ -94,27 +94,36 @@ async function pdfToImages(file) {
 }
 
 /**
- * Extract survey fields from a PDF or image file using Gemini.
+ * Extract survey fields from one or more PDF/image files using Gemini.
+ * Multiple files (e.g. a front-of-form photo + back-of-form photo) are sent
+ * together in a single Gemini call so they're consolidated into one survey.
  * The Gemini API key is stored in localStorage (browser-only, never sent to any server except Gemini).
  *
- * @param {File} file - PDF or image file
+ * @param {File[]} files - Array of 1-2 PDF or image files representing the same survey
  * @param {string} apiKey - Gemini API key
  * @returns {Object[]} array of extracted survey objects (one per detected respondent)
  */
-export async function extractSurveyFromFile(file, apiKey) {
+export async function extractSurveyFromFiles(files, apiKey) {
   if (!apiKey) throw new Error('Gemini API key not configured')
+  if (!files || files.length === 0) throw new Error('No file provided')
 
   let imageParts = []
 
-  if (file.type === 'application/pdf') {
-    const images = await pdfToImages(file)
-    imageParts = images.map(base64 => ({
-      inlineData: { mimeType: 'image/jpeg', data: base64 }
-    }))
-  } else {
-    const base64 = await fileToBase64(file)
-    imageParts = [{ inlineData: { mimeType: file.type, data: base64 } }]
+  for (const file of files) {
+    if (file.type === 'application/pdf') {
+      const images = await pdfToImages(file)
+      imageParts.push(...images.map(base64 => ({
+        inlineData: { mimeType: 'image/jpeg', data: base64 }
+      })))
+    } else {
+      const base64 = await fileToBase64(file)
+      imageParts.push({ inlineData: { mimeType: file.type, data: base64 } })
+    }
   }
+
+  const prompt = files.length > 1
+    ? EXTRACTION_PROMPT + `\n\nNote: the ${files.length} images provided are separate photos of the SAME survey form (e.g. front and back). Treat them as one combined form and merge fields across all images into a single result.`
+    : EXTRACTION_PROMPT
 
   const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
     method: 'POST',
@@ -122,7 +131,7 @@ export async function extractSurveyFromFile(file, apiKey) {
     body: JSON.stringify({
       contents: [{
         parts: [
-          { text: EXTRACTION_PROMPT },
+          { text: prompt },
           ...imageParts
         ]
       }],
