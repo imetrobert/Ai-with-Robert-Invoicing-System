@@ -39,17 +39,17 @@ function exportEmailList(responses) {
 
 function exportAllData(responses) {
   const headers = [
-    'Date', 'First Name', 'Last Name', 'Email', 'Phone', 'Address',
+    'Date', 'Location', 'First Name', 'Last Name', 'Email', 'Phone', 'Address',
     'Age Range', 'Language', 'Gender',
     'Tech Comfort', 'Tech Interest', 'AI Interest',
-    'Topics', 'Learning Format', 'Zoom Comfort', 'Online Preference',
+    'Topics', 'Other Topic', 'Learning Format', 'Zoom Comfort', 'Online Preference',
     'Ongoing Support', 'Enjoyed Most', 'Next Topic', 'Newsletter'
   ]
   const rows = responses.map(r => [
-    r.created_at?.split('T')[0], r.first_name, r.last_name, r.email, r.phone, r.address,
+    r.workshop_date || r.created_at?.split('T')[0], r.workshop_location, r.first_name, r.last_name, r.email, r.phone, r.address,
     r.age_range, r.preferred_language, r.gender,
     r.tech_comfort, r.tech_interest, r.ai_interest,
-    (r.topics || []).join('; '), r.learning_format, r.zoom_comfort, r.online_preference,
+    (r.topics || []).join('; '), r.topics_other, r.learning_format, r.zoom_comfort, r.online_preference,
     (r.ongoing_support || []).join('; '), r.enjoyed_most, r.next_topic_comments,
     r.wants_newsletter ? 'Yes' : 'No'
   ].map(escapeCSV).join(','))
@@ -192,8 +192,11 @@ export default function SurveyDashboard() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                      {r.created_at?.split('T')[0]}
+                      {r.workshop_date || r.created_at?.split('T')[0]}
                     </span>
+                    {r.workshop_location && (
+                      <span style={{ fontSize: 11, color: 'var(--muted)' }}>{r.workshop_location}</span>
+                    )}
                     {r.wants_newsletter && (
                       <span style={{ fontSize: 10, fontWeight: 700, background: 'var(--success-bg)', color: 'var(--success)', padding: '2px 7px', borderRadius: 20 }}>
                         Newsletter ✓

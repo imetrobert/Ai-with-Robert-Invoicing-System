@@ -28,14 +28,15 @@ const SUPPORT_OPTIONS = [
 ]
 
 const EMPTY_FORM = {
+  workshop_date: new Date().toISOString().split('T')[0],
+  workshop_location: '',
   first_name: '', last_name: '', email: '', phone: '', address: '',
   age_range: '', preferred_language: '', gender: '',
   tech_comfort: '', tech_interest: '', ai_interest: '',
-  topics: [], learning_format: '',
+  topics: [], topics_other: '', learning_format: '',
   zoom_comfort: '', online_preference: '', ongoing_support: [],
   enjoyed_most: '', next_topic_comments: '',
   wants_newsletter: false,
-  workshop_date: new Date().toISOString().split('T')[0],
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -170,13 +171,19 @@ export default function SurveyUpload() {
       setExtractLog(`Extraction complete — found ${count} survey${count > 1 ? 's' : ''}. Please review.`)
 
       // Merge each extracted survey with defaults
+      const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
       const merged = extractedArray.map(extracted => ({
         ...EMPTY_FORM,
         ...Object.fromEntries(
           Object.entries(extracted).map(([k, v]) => [k, v ?? EMPTY_FORM[k] ?? ''])
         ),
         source_pdf_name: combinedName,
-        workshop_date: new Date().toISOString().split('T')[0],
+        // Use the date Gemini read off the form itself; only fall back to
+        // today if it didn't find one there or returned something the date
+        // input can't display.
+        workshop_date: ISO_DATE.test(extracted.workshop_date)
+          ? extracted.workshop_date
+          : new Date().toISOString().split('T')[0],
       }))
 
       setSurveys(merged)
@@ -430,6 +437,10 @@ export default function SurveyUpload() {
                     <label className="form-label">Workshop Date</label>
                     <input className="form-control" type="date" value={formData.workshop_date} onChange={setVal('workshop_date')} />
                   </div>
+                  <div className="form-group">
+                    <label className="form-label">Workshop Location</label>
+                    <input className="form-control" value={formData.workshop_location} onChange={setVal('workshop_location')} placeholder="e.g. Community Library, Room 2" />
+                  </div>
                 </div>
                 <RadioGroup label="Age Range" name="age_range" value={formData.age_range} onChange={set('age_range')}
                   options={[
@@ -484,6 +495,10 @@ export default function SurveyUpload() {
               <div className="card-header"><h2>Topics & Future Workshops</h2></div>
               <div className="card-body">
                 <CheckGroup label="4. Topics of interest" name="topics" value={formData.topics} onChange={set('topics')} options={TOPICS_OPTIONS} />
+                <div className="form-group">
+                  <label className="form-label">Other topic (from the write-in line)</label>
+                  <input className="form-control" value={formData.topics_other} onChange={setVal('topics_other')} />
+                </div>
                 <RadioGroup label="5. Preferred learning format" name="learning_format" value={formData.learning_format} onChange={set('learning_format')}
                   options={[
                     { value: 'one_on_one',     label: 'One-on-one tutoring' },
