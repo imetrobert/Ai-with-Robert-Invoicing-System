@@ -11,6 +11,8 @@ Analyze this survey image carefully and extract ALL fields. Return ONLY valid JS
 
 Return exactly this structure (use null for fields you cannot read):
 {
+  "workshop_date": string (YYYY-MM-DD) or null,
+  "workshop_location": string or null,
   "first_name": string or null,
   "last_name": string or null,
   "email": string or null,
@@ -23,6 +25,7 @@ Return exactly this structure (use null for fields you cannot read):
   "tech_interest": "very" | "somewhat" | "not_very" | null,
   "ai_interest": "very" | "somewhat" | "not_very" | null,
   "topics": array of strings from: ["chatgpt_emails", "online_scams", "ai_translate", "ai_images", "smartphones_tablets", "video_calling", "online_banking", "ai_health", "social_media"],
+  "topics_other": string or null,
   "learning_format": "one_on_one" | "small_group" | "online" | "no_preference" | null,
   "zoom_comfort": "very" | "somewhat" | "not_very" | "never_tried" | null,
   "online_preference": "much_more" | "slightly_more" | "same" | "slightly_less" | "much_less" | null,
@@ -32,8 +35,33 @@ Return exactly this structure (use null for fields you cannot read):
   "wants_newsletter": true | false
 }
 
-For checkboxes: look for checkmarks, X marks, or filled circles next to options.
-For handwritten text: transcribe as accurately as possible.
+WHERE TO FIND workshop_date AND workshop_location:
+Near the top of page 1, below the "AI with Robert" logo and to the right of the intro line, there are two
+handwritten fields labeled "Date" and "Location" on a plain white strip. These are filled in by hand for
+this specific session — they are NOT the same as the attendee's own address field further down the form.
+- workshop_date: convert whatever date format is handwritten (e.g. "May 28", "5/28/25", "28-05-2025") into
+  strict YYYY-MM-DD. If the year is not written, infer the most recent plausible year. If the date field is
+  blank or you cannot confidently parse a real date, return null — never guess a date that isn't there.
+- workshop_location: transcribe the handwritten location as written (venue name, neighborhood, or both).
+  Return null if left blank.
+
+CHECKBOXES AND RADIO BUTTONS:
+Every option on this form is a bold, dark-outlined square (checkbox) or circle (radio button) on a white
+background, roughly 16x16px, positioned immediately to the left of its label text. A response is marked
+with a checkmark, X, or filled/shaded interior inside that specific box — it will visibly break the box's
+white interior. Only count an option as selected if the mark is clearly inside or directly overlapping
+that option's own box. Do not infer a selection from a mark's proximity to a label, from underlining the
+label text instead of the box, or from stray pen strokes between options — when in doubt, treat it as
+unmarked. For single-choice questions (radio buttons), there should be at most one marked option; if you
+see what looks like two marks, prefer the one most clearly and fully filled and treat the other as unmarked.
+
+HANDWRITTEN TEXT FIELDS (name, email, phone, address, topics_other, enjoyed_most, next_topic_comments):
+Transcribe exactly as written, preserving the person's own wording. If a field is left blank or is
+genuinely illegible after careful attempt, return null rather than guessing a plausible-sounding value.
+
+The "Other" write-in line under question 4 (topics) is separate from the fixed topic checkboxes — put
+whatever is handwritten there into topics_other, not into the topics array.
+
 The form may be 2 pages — extract from all visible content.`
 
 /**
