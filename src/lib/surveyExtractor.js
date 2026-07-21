@@ -32,7 +32,8 @@ Return exactly this structure (use null for fields you cannot read):
   "ongoing_support": array of strings from: ["newsletter", "group_workshops", "helpline", "video_tutorials", "private_group"],
   "enjoyed_most": string or null,
   "next_topic_comments": string or null,
-  "wants_newsletter": true | false
+  "wants_newsletter": true | false,
+  "low_confidence_fields": array of JSON key names above that you are NOT confident about (empty array if none)
 }
 
 WHERE TO FIND workshop_date AND workshop_location:
@@ -93,7 +94,21 @@ genuinely illegible after careful attempt, return null rather than guessing a pl
 The "Other" write-in line under question 4 (topics) is separate from the fixed topic checkboxes — put
 whatever is handwritten there into topics_other, not into the topics array.
 
-The form may be 2 pages — extract from all visible content.`
+The form may be 2 pages — extract from all visible content.
+
+low_confidence_fields (self-check, do this LAST after filling in every other field above):
+Go back over each field you extracted and list the JSON key name in low_confidence_fields whenever any of
+these apply:
+- A mark sits close to the boundary between two options, or its ink meaningfully overlaps more than one
+  circle/square, so you had to pick the "greater overlap" one rather than a clean single mark.
+- The mark itself is faint, smudged, very thin, or partially cut off by a fold/shadow in the photo.
+- You inferred a value that isn't explicitly written (e.g. guessing the year for workshop_date, or reading
+  a name/email through messy cursive) rather than reading it directly and confidently.
+- For a checkbox list (topics, ongoing_support), you're unsure whether a specific item was intended to be
+  marked at all (as opposed to being confident about the overall set but shaky on one member of it).
+Do NOT include a field just because it is null/blank — a clearly empty field is not low-confidence, it's
+just unanswered. Only flag fields where a mark exists but its meaning is genuinely uncertain. Return an
+empty array if every field you read was unambiguous.`
 
 /**
  * Convert a File to base64 string

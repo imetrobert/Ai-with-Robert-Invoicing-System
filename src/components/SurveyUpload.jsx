@@ -37,14 +37,34 @@ const EMPTY_FORM = {
   zoom_comfort: '', online_preference: '', ongoing_support: [],
   enjoyed_most: '', next_topic_comments: '',
   wants_newsletter: false,
+  low_confidence_fields: [],
+}
+
+// Human-readable labels for the low-confidence summary banner.
+const FIELD_LABELS = {
+  workshop_date: 'Workshop Date', workshop_location: 'Workshop Location',
+  first_name: 'First Name', last_name: 'Last Name', email: 'Email', phone: 'Phone', address: 'Address / Apt',
+  age_range: 'Age Range', preferred_language: 'Preferred Language', gender: 'Gender',
+  tech_comfort: 'Tech Comfort', tech_interest: 'Tech Interest', ai_interest: 'AI Interest',
+  topics: 'Topics of Interest', topics_other: 'Other Topic', learning_format: 'Learning Format',
+  zoom_comfort: 'Zoom Comfort', online_preference: 'Online Preference', ongoing_support: 'Ongoing Support',
+  enjoyed_most: 'Enjoyed Most', next_topic_comments: 'Next Topic / Comments', wants_newsletter: 'Newsletter Opt-in',
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function RadioGroup({ label, name, value, onChange, options }) {
+function FlagBadge() {
   return (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
+    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--warn)', marginLeft: 8 }}>
+      ⚠️ double-check
+    </span>
+  )
+}
+
+function RadioGroup({ label, name, value, onChange, options, flagged }) {
+  return (
+    <div className="form-group" style={flagged ? { background: 'var(--warn-bg)', border: '1px solid #fde68a', borderRadius: 8, padding: 10 } : undefined}>
+      <label className="form-label">{label}{flagged && <FlagBadge />}</label>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
         {options.map(opt => (
           <label key={opt.value} style={{
@@ -70,14 +90,14 @@ function RadioGroup({ label, name, value, onChange, options }) {
   )
 }
 
-function CheckGroup({ label, name, value = [], onChange, options }) {
+function CheckGroup({ label, name, value = [], onChange, options, flagged }) {
   const toggle = (id) => {
     const next = value.includes(id) ? value.filter(v => v !== id) : [...value, id]
     onChange(next)
   }
   return (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
+    <div className="form-group" style={flagged ? { background: 'var(--warn-bg)', border: '1px solid #fde68a', borderRadius: 8, padding: 10 } : undefined}>
+      <label className="form-label">{label}{flagged && <FlagBadge />}</label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {options.map(opt => (
           <label key={opt.id} style={{
@@ -98,6 +118,24 @@ function CheckGroup({ label, name, value = [], onChange, options }) {
           </label>
         ))}
       </div>
+    </div>
+  )
+}
+
+function TextField({ label, value, onChange, flagged, type = 'text', placeholder, textarea, rows }) {
+  const Input = textarea ? 'textarea' : 'input'
+  return (
+    <div className="form-group" style={flagged ? { background: 'var(--warn-bg)', border: '1px solid #fde68a', borderRadius: 8, padding: 10 } : undefined}>
+      <label className="form-label">{label}{flagged && <FlagBadge />}</label>
+      <Input
+        className="form-control"
+        type={textarea ? undefined : type}
+        rows={rows}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        style={flagged ? { borderColor: '#f59e0b', background: 'white' } : undefined}
+      />
     </div>
   )
 }
@@ -206,6 +244,10 @@ export default function SurveyUpload() {
   const set = (field) => (val) => setFormData(prev => ({ ...prev, [field]: val }))
   const setVal = (field) => (e) => setFormData(prev => ({ ...prev, [field]: e.target.value }))
 
+  // Gemini's low-confidence self-flags — review-time UI only, not a DB column.
+  const flaggedFields = Array.isArray(formData.low_confidence_fields) ? formData.low_confidence_fields : []
+  const isFlagged = (field) => flaggedFields.includes(field)
+
   // ── Save ──────────────────────────────────────────────────────────────────
   async function handleSave() {
     if (!formData.first_name && !formData.email) {
@@ -215,8 +257,9 @@ export default function SurveyUpload() {
     setStage('saving')
     setError('')
 
+    const { low_confidence_fields, ...toSave } = formData
     const { error: dbErr } = await supabase.from('survey_responses').insert([{
-      ...formData,
+      ...toSave,
       manually_reviewed: true,
       topics: formData.topics || [],
       ongoing_support: formData.ongoing_support || [],
@@ -404,58 +447,45 @@ export default function SurveyUpload() {
               ✅ Gemini extracted the fields below — review for accuracy, correct anything needed, then save.
             </div>
 
+            {flaggedFields.length > 0 && (
+              <div className="alert alert-warning" style={{ marginBottom: 16 }}>
+                ⚠️ Gemini wasn't fully confident on {flaggedFields.length} field{flaggedFields.length > 1 ? 's' : ''} —
+                please double-check the highlighted field{flaggedFields.length > 1 ? 's' : ''} below against the paper form:{' '}
+                <strong>{flaggedFields.map(f => FIELD_LABELS[f] || f).join(', ')}</strong>
+              </div>
+            )}
+
             {/* Section 1 */}
             <div className="card" style={{ marginBottom: 12 }}>
               <div className="card-header"><h2>Personal Information</h2></div>
               <div className="card-body">
                 <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">First Name</label>
-                    <input className="form-control" value={formData.first_name} onChange={setVal('first_name')} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Last Name</label>
-                    <input className="form-control" value={formData.last_name} onChange={setVal('last_name')} />
-                  </div>
+                  <TextField label="First Name" value={formData.first_name} onChange={setVal('first_name')} flagged={isFlagged('first_name')} />
+                  <TextField label="Last Name" value={formData.last_name} onChange={setVal('last_name')} flagged={isFlagged('last_name')} />
                 </div>
                 <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Email</label>
-                    <input className="form-control" type="email" value={formData.email} onChange={setVal('email')} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Phone</label>
-                    <input className="form-control" value={formData.phone} onChange={setVal('phone')} />
-                  </div>
+                  <TextField label="Email" type="email" value={formData.email} onChange={setVal('email')} flagged={isFlagged('email')} />
+                  <TextField label="Phone" value={formData.phone} onChange={setVal('phone')} flagged={isFlagged('phone')} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Address / Apt</label>
-                  <input className="form-control" value={formData.address} onChange={setVal('address')} />
-                </div>
+                <TextField label="Address / Apt" value={formData.address} onChange={setVal('address')} flagged={isFlagged('address')} />
                 <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Workshop Date</label>
-                    <input className="form-control" type="date" value={formData.workshop_date} onChange={setVal('workshop_date')} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Workshop Location</label>
-                    <input className="form-control" value={formData.workshop_location} onChange={setVal('workshop_location')} placeholder="e.g. Community Library, Room 2" />
-                  </div>
+                  <TextField label="Workshop Date" type="date" value={formData.workshop_date} onChange={setVal('workshop_date')} flagged={isFlagged('workshop_date')} />
+                  <TextField label="Workshop Location" value={formData.workshop_location} onChange={setVal('workshop_location')} placeholder="e.g. Community Library, Room 2" flagged={isFlagged('workshop_location')} />
                 </div>
-                <RadioGroup label="Age Range" name="age_range" value={formData.age_range} onChange={set('age_range')}
+                <RadioGroup label="Age Range" name="age_range" value={formData.age_range} onChange={set('age_range')} flagged={isFlagged('age_range')}
                   options={[
                     { value: 'under_50', label: 'Under 50' },
                     { value: '50_64',    label: '50–64' },
                     { value: '65_74',    label: '65–74' },
                     { value: '75_plus',  label: '75+' },
                   ]} />
-                <RadioGroup label="Preferred Language" name="preferred_language" value={formData.preferred_language} onChange={set('preferred_language')}
+                <RadioGroup label="Preferred Language" name="preferred_language" value={formData.preferred_language} onChange={set('preferred_language')} flagged={isFlagged('preferred_language')}
                   options={[
                     { value: 'english', label: 'English' },
                     { value: 'french',  label: 'French' },
                     { value: 'both',    label: 'Both / Either' },
                   ]} />
-                <RadioGroup label="Gender" name="gender" value={formData.gender} onChange={set('gender')}
+                <RadioGroup label="Gender" name="gender" value={formData.gender} onChange={set('gender')} flagged={isFlagged('gender')}
                   options={[
                     { value: 'male',       label: 'Male' },
                     { value: 'female',     label: 'Female' },
@@ -468,20 +498,20 @@ export default function SurveyUpload() {
             <div className="card" style={{ marginBottom: 12 }}>
               <div className="card-header"><h2>Technology Comfort</h2></div>
               <div className="card-body">
-                <RadioGroup label="1. Comfortable with technology?" name="tech_comfort" value={formData.tech_comfort} onChange={set('tech_comfort')}
+                <RadioGroup label="1. Comfortable with technology?" name="tech_comfort" value={formData.tech_comfort} onChange={set('tech_comfort')} flagged={isFlagged('tech_comfort')}
                   options={[
                     { value: 'very',        label: 'Very comfortable' },
                     { value: 'somewhat',    label: 'Somewhat' },
                     { value: 'not_very',    label: 'Not very' },
                     { value: 'not_at_all',  label: 'Not at all' },
                   ]} />
-                <RadioGroup label="2. Interested in improving tech skills?" name="tech_interest" value={formData.tech_interest} onChange={set('tech_interest')}
+                <RadioGroup label="2. Interested in improving tech skills?" name="tech_interest" value={formData.tech_interest} onChange={set('tech_interest')} flagged={isFlagged('tech_interest')}
                   options={[
                     { value: 'very',     label: 'Very interested' },
                     { value: 'somewhat', label: 'Somewhat' },
                     { value: 'not_very', label: 'Not very' },
                   ]} />
-                <RadioGroup label="3. Interested in learning about AI?" name="ai_interest" value={formData.ai_interest} onChange={set('ai_interest')}
+                <RadioGroup label="3. Interested in learning about AI?" name="ai_interest" value={formData.ai_interest} onChange={set('ai_interest')} flagged={isFlagged('ai_interest')}
                   options={[
                     { value: 'very',     label: 'Very interested' },
                     { value: 'somewhat', label: 'Somewhat' },
@@ -494,12 +524,9 @@ export default function SurveyUpload() {
             <div className="card" style={{ marginBottom: 12 }}>
               <div className="card-header"><h2>Topics & Future Workshops</h2></div>
               <div className="card-body">
-                <CheckGroup label="4. Topics of interest" name="topics" value={formData.topics} onChange={set('topics')} options={TOPICS_OPTIONS} />
-                <div className="form-group">
-                  <label className="form-label">Other topic (from the write-in line)</label>
-                  <input className="form-control" value={formData.topics_other} onChange={setVal('topics_other')} />
-                </div>
-                <RadioGroup label="5. Preferred learning format" name="learning_format" value={formData.learning_format} onChange={set('learning_format')}
+                <CheckGroup label="4. Topics of interest" name="topics" value={formData.topics} onChange={set('topics')} options={TOPICS_OPTIONS} flagged={isFlagged('topics')} />
+                <TextField label="Other topic (from the write-in line)" value={formData.topics_other} onChange={setVal('topics_other')} flagged={isFlagged('topics_other')} />
+                <RadioGroup label="5. Preferred learning format" name="learning_format" value={formData.learning_format} onChange={set('learning_format')} flagged={isFlagged('learning_format')}
                   options={[
                     { value: 'one_on_one',     label: 'One-on-one tutoring' },
                     { value: 'small_group',    label: 'Small group workshop' },
@@ -513,14 +540,14 @@ export default function SurveyUpload() {
             <div className="card" style={{ marginBottom: 12 }}>
               <div className="card-header"><h2>How You Like to Learn</h2></div>
               <div className="card-body">
-                <RadioGroup label="6. Comfortable joining online video calls?" name="zoom_comfort" value={formData.zoom_comfort} onChange={set('zoom_comfort')}
+                <RadioGroup label="6. Comfortable joining online video calls?" name="zoom_comfort" value={formData.zoom_comfort} onChange={set('zoom_comfort')} flagged={isFlagged('zoom_comfort')}
                   options={[
                     { value: 'very',        label: 'Very comfortable' },
                     { value: 'somewhat',    label: 'Somewhat' },
                     { value: 'not_very',    label: 'Not very' },
                     { value: 'never_tried', label: 'Never tried' },
                   ]} />
-                <RadioGroup label="7. Would you attend online instead of in-person?" name="online_preference" value={formData.online_preference} onChange={set('online_preference')}
+                <RadioGroup label="7. Would you attend online instead of in-person?" name="online_preference" value={formData.online_preference} onChange={set('online_preference')} flagged={isFlagged('online_preference')}
                   options={[
                     { value: 'much_more',     label: 'Much more likely' },
                     { value: 'slightly_more', label: 'Slightly more likely' },
@@ -528,7 +555,7 @@ export default function SurveyUpload() {
                     { value: 'slightly_less', label: 'Slightly less likely' },
                     { value: 'much_less',     label: 'Much less likely' },
                   ]} />
-                <CheckGroup label="8. Ongoing support you'd sign up for" name="ongoing_support" value={formData.ongoing_support} onChange={set('ongoing_support')} options={SUPPORT_OPTIONS} />
+                <CheckGroup label="8. Ongoing support you'd sign up for" name="ongoing_support" value={formData.ongoing_support} onChange={set('ongoing_support')} options={SUPPORT_OPTIONS} flagged={isFlagged('ongoing_support')} />
               </div>
             </div>
 
@@ -536,20 +563,15 @@ export default function SurveyUpload() {
             <div className="card" style={{ marginBottom: 12 }}>
               <div className="card-header"><h2>Feedback</h2></div>
               <div className="card-body">
-                <div className="form-group">
-                  <label className="form-label">9. What did you enjoy most?</label>
-                  <textarea className="form-control" value={formData.enjoyed_most} onChange={setVal('enjoyed_most')} rows={3} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">10. Next topic / other comments</label>
-                  <textarea className="form-control" value={formData.next_topic_comments} onChange={setVal('next_topic_comments')} rows={3} />
-                </div>
+                <TextField label="9. What did you enjoy most?" textarea rows={3} value={formData.enjoyed_most} onChange={setVal('enjoyed_most')} flagged={isFlagged('enjoyed_most')} />
+                <TextField label="10. Next topic / other comments" textarea rows={3} value={formData.next_topic_comments} onChange={setVal('next_topic_comments')} flagged={isFlagged('next_topic_comments')} />
                 <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 14px', background: formData.wants_newsletter ? 'var(--success-bg)' : 'var(--bg)', borderRadius: 8, border: `1.5px solid ${formData.wants_newsletter ? '#86efac' : 'var(--border)'}` }}>
                   <input type="checkbox" checked={formData.wants_newsletter} onChange={e => set('wants_newsletter')(e.target.checked)}
                     style={{ accentColor: 'var(--success)', width: 16, height: 16 }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: formData.wants_newsletter ? 'var(--success)' : 'var(--text)' }}>
                     Yes — keep me informed about upcoming workshops & offers
                   </span>
+                  {isFlagged('wants_newsletter') && <FlagBadge />}
                 </label>
               </div>
             </div>
