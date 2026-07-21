@@ -5,7 +5,7 @@
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
-const EXTRACTION_PROMPT = `You are extracting data from a handwritten survey form for "AI with Robert" workshops.
+const EXTRACTION_PROMPT = `You are extracting data from a handwritten survey form for "AI with Robert" workshops. The form is filled in by hand by senior citizens, so marks are often shaky, oversized, uneven, or drawn slightly outside the lines — read carefully and go strictly by which shape a mark physically overlaps, never by assumptions about layout or reading order.
 
 Analyze this survey image carefully and extract ALL fields. Return ONLY valid JSON, no markdown, no explanation.
 
@@ -36,24 +36,55 @@ Return exactly this structure (use null for fields you cannot read):
 }
 
 WHERE TO FIND workshop_date AND workshop_location:
-Near the top of page 1, below the "AI with Robert" logo and to the right of the intro line, there are two
-handwritten fields labeled "Date" and "Location" on a plain white strip. These are filled in by hand for
-this specific session — they are NOT the same as the attendee's own address field further down the form.
+Directly below the dark navy header banner (logo, "AI with Robert" title, and contact info) at the very top
+of page 1 — and ABOVE the light blue "Thank you for attending today's workshop..." banner — there are two
+handwritten fields side by side on underlined strips: "Date" on the left, "Location" on the right. These are
+filled in by hand for this specific session — they are NOT the same as the attendee's own address field
+further down the form.
 - workshop_date: convert whatever date format is handwritten (e.g. "May 28", "5/28/25", "28-05-2025") into
   strict YYYY-MM-DD. If the year is not written, infer the most recent plausible year. If the date field is
   blank or you cannot confidently parse a real date, return null — never guess a date that isn't there.
 - workshop_location: transcribe the handwritten location as written (venue name, neighborhood, or both).
   Return null if left blank.
 
+FORM LAYOUT — OPTIONS ARE ARRANGED IN ROWS AND COLUMNS, NOT A SIMPLE VERTICAL LIST:
+Every selectable option is a small circle (radio button, single choice) or square (checkbox, multiple
+choice) positioned immediately to the left of its label text, and the label text often wraps onto two
+lines beside its shape. Most questions lay their options out horizontally in a single row rather than
+stacked vertically, so adjacent options — and their two-line labels — sit close together. Match each mark
+strictly to the shape it overlaps; never assign it to the nearest text or by guessing left-to-right order.
+
+- Section 1 ("Your Information") has THREE separate single-select radio groups arranged side by side in
+  one row: Age Range (Under 50 / 50-64 / 65-74 / 75+), Preferred Language (English / French / Both/Either),
+  and Gender (Male / Female / Prefer not to say). Treat each as an independent question — a mark in one
+  group's column must never be attributed to a neighboring group just because they're on the same row.
+- Questions 1, 2, 3, 5, 6, and 7 each lay their radio-button options out in a single horizontal row, left
+  to right in the order given in the JSON schema above (e.g. question 1 has 4 options in a row: Very
+  comfortable, Somewhat comfortable, Not very comfortable, Not comfortable at all).
+- Question 4 (topics) is a checkbox list in TWO columns. Left column, top to bottom: ChatGPT for
+  emails/questions, spotting online scams/phishing, AI translation, AI images/creative tools, smartphones
+  & tablets. Right column, top to bottom: video calling, online banking safety, AI for health/appointments,
+  social media basics, then an "Other:" write-in line. A left-column mark must never be read as a
+  right-column item or vice versa — verify which column the mark's shape actually sits in.
+- Question 8 (ongoing support) is a checkbox list in a SINGLE column, top to bottom: newsletter, community
+  group workshops, on-call helpline, video tutorials, private online group.
+- The newsletter opt-in ("Yes — keep me informed...") is a separate single checkbox inside a light blue box
+  near the very bottom of page 2, below question 10 — it maps to wants_newsletter (true if marked, false if
+  left blank).
+
 CHECKBOXES AND RADIO BUTTONS:
-Every option on this form is a bold, dark-outlined square (checkbox) or circle (radio button) on a white
-background, roughly 16x16px, positioned immediately to the left of its label text. A response is marked
-with a checkmark, X, or filled/shaded interior inside that specific box — it will visibly break the box's
-white interior. Only count an option as selected if the mark is clearly inside or directly overlapping
-that option's own box. Do not infer a selection from a mark's proximity to a label, from underlining the
-label text instead of the box, or from stray pen strokes between options — when in doubt, treat it as
-unmarked. For single-choice questions (radio buttons), there should be at most one marked option; if you
-see what looks like two marks, prefer the one most clearly and fully filled and treat the other as unmarked.
+Each option's circle or square is a thin-outlined shape on a white background, roughly 14-16px, immediately
+to the left of its label. Outline weight and color can vary slightly depending on scan/photo quality — do
+not rely on the box looking bold or dark; instead look for the closed circle/square shape itself. A response
+is marked with a checkmark, X, filled/shaded interior, scribble, or circled-in stroke — any handwritten mark
+whose ink is mostly inside or directly overlapping that specific shape counts as selected, even if it is
+uneven, shaky, oversized, or slightly extends past the shape's edge (this is common with elderly handwriting
+and should still count). If a mark could plausibly belong to two adjacent shapes because they're close
+together, choose the one with the greater overlap of ink, not the one closer to the label text. Only fall
+back to "unmarked" when there is no meaningful mark on or touching any shape for that question, or a stray
+pen stroke sits clearly in the empty space between two options rather than on either shape. For single-choice
+questions (radio buttons), there should be at most one marked option; if you see what looks like two marks,
+prefer the one most clearly and fully filled and treat the other as unmarked.
 
 HANDWRITTEN TEXT FIELDS (name, email, phone, address, topics_other, enjoyed_most, next_topic_comments):
 Transcribe exactly as written, preserving the person's own wording. If a field is left blank or is
