@@ -109,8 +109,8 @@ export default function InvoiceView() {
             </span>
           )}
           <span style={{ fontSize: 12, color: (invoice.view_count || 0) > 0 ? 'var(--blue)' : 'var(--muted)', fontWeight: 600 }}>
-            👁 {invoice.view_count || 0} view{invoice.view_count !== 1 ? 's' : ''}
-            {invoice.first_viewed_at ? ` · first opened ${formatDateShort(utcToETDateStr(invoice.first_viewed_at))}` : ''}
+            👁 {invoice.view_count || 0} invoice link click{invoice.view_count !== 1 ? 's' : ''}
+            {invoice.first_viewed_at ? ` · first clicked ${formatDateShort(utcToETDateStr(invoice.first_viewed_at))}` : ''}
           </span>
           <span style={{ fontSize: 12, color: (invoice.pdf_download_count || 0) > 0 ? 'var(--blue)' : 'var(--muted)', fontWeight: 600 }}>
             ⬇ {invoice.pdf_download_count || 0} PDF download{invoice.pdf_download_count !== 1 ? 's' : ''}

@@ -68,7 +68,7 @@ function exportToCSV(invoices) {
     'Address Line 1', 'Address Line 2', 'City', 'Postal Code',
     'Subtotal (CAD)', 'Discount Type', 'Discount Value', 'Discount Amount (CAD)',
     'Tax Enabled', 'Tax Amount (CAD)', 'Total (CAD)',
-    'Emailed', 'Emailed Date (ET)', 'Views',
+    'Emailed', 'Emailed Date (ET)', 'Invoice Link Clicks',
     'Notes',
   ]
 
