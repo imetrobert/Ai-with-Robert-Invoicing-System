@@ -147,7 +147,7 @@ export default function Dashboard() {
         total, subtotal, discount_type, discount_value, discount_amount,
         gst_enabled, gst_amount,
         province, address_line1, address_line2, address_city, address_postal,
-        status, emailed_at, view_count, notes
+        status, emailed_at, email_log, view_count, notes
       `)
       .order('created_at', { ascending: false })
     if (!error) setInvoices(data || [])
@@ -227,11 +227,18 @@ export default function Dashboard() {
     const nowET        = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' }))
     const cycleStart   = new Date(nowET.getFullYear(), nowET.getMonth(), 10)
     if (nowET < cycleStart) cycleStart.setMonth(cycleStart.getMonth() - 1)
-    return invoices.filter(i => {
-      if (!i.emailed_at) return false
-      const emailedET = new Date(new Date(i.emailed_at).toLocaleString('en-US', { timeZone: 'America/Toronto' }))
-      return emailedET >= cycleStart
-    }).length
+    // email_log holds a timestamp per actual send (initial send, resends,
+    // payment confirmations, etc). Older invoices sent before email_log
+    // existed fall back to their single emailed_at timestamp.
+    let count = 0
+    invoices.forEach(i => {
+      const log = Array.isArray(i.email_log) && i.email_log.length ? i.email_log : (i.emailed_at ? [i.emailed_at] : [])
+      log.forEach(ts => {
+        const sentET = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'America/Toronto' }))
+        if (sentET >= cycleStart) count++
+      })
+    })
+    return count
   })()
   const EMAIL_LIMIT = 200
   const emailsLeft  = EMAIL_LIMIT - emailsUsed

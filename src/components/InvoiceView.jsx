@@ -48,8 +48,12 @@ export default function InvoiceView() {
     try {
       await sendInvoiceEmail(invoice)
       const now = new Date().toISOString()
-      await supabase.from('invoices').update({ emailed_at: now }).eq('id', id)
-      setInvoice(prev => ({ ...prev, emailed_at: now }))
+      // email_log records every send (not just the latest) so the EmailJS
+      // quota tracker on the dashboard can count actual sends per cycle,
+      // not just distinct invoices.
+      const emailLog = [...(invoice.email_log || []), now]
+      await supabase.from('invoices').update({ emailed_at: now, email_log: emailLog }).eq('id', id)
+      setInvoice(prev => ({ ...prev, emailed_at: now, email_log: emailLog }))
       setEmailMsg({ type: 'success', text: `Emailed to ${invoice.client_email}!` })
     } catch (e) {
       const msg = e?.text || e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || 'Unknown error'
@@ -258,8 +262,9 @@ export default function InvoiceView() {
                 try {
                   await sendInvoiceEmail({ ...invoice, status: 'paid' })
                   const now = new Date().toISOString()
-                  await supabase.from('invoices').update({ emailed_at: now }).eq('id', id)
-                  setInvoice(prev => ({ ...prev, emailed_at: now }))
+                  const emailLog = [...(invoice.email_log || []), now]
+                  await supabase.from('invoices').update({ emailed_at: now, email_log: emailLog }).eq('id', id)
+                  setInvoice(prev => ({ ...prev, emailed_at: now, email_log: emailLog }))
                   setEmailMsg({ type: 'success', text: `Payment confirmation sent to ${invoice.client_email}!` })
                 } catch (e) {
                   const msg = e?.text || e?.message || 'Unknown error'
