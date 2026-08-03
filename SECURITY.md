@@ -47,6 +47,12 @@ Current shape:
   way — see open item 5.
 - A malformed or empty token returns zero rows rather than raising, so the app's
   existing "Invoice Not Found" screen handles it.
+- `invoices.view_token` is a `uuid` column. Inferred, not queried: the
+  `increment_invoice_view(token uuid)` overload compares `view_token = token`
+  with no cast, and PostgreSQL validates SQL function bodies at creation time,
+  so that function could not exist if the column were `text`. Both
+  `invoice_by_token` and the `text` overload cast on the column side and work
+  either way.
 - There is no anonymous SELECT policy on `public.invoices`. An unauthenticated
   request to `/rest/v1/invoices` returns `[]`.
 
@@ -68,24 +74,76 @@ Recorded deliberately, none actioned. Each is a separate decision.
 
 `increment_invoice_view(token text)` and `increment_invoice_view(token uuid)`
 both exist with the same parameter name. PostgREST resolves RPC arguments by
-name, so it cannot disambiguate the two. This is a plausible cause of the
-inconsistent invoice-link click counts.
+name, not type, so `rpc('increment_invoice_view', { token })` cannot pick
+between them.
 
-The cleanup is a single `drop function`, but which overload to drop depends on
-what else calls them. Wanted as a deliberate change, not folded into other work.
+Repo evidence that this has been failing rather than merely being untidy:
+commit `09ce9e0` (2026-06-03) changed the call from `{ token }` to
+`{ token: String(token) }`, with the comment "Explicitly cast token to string to
+match increment_invoice_view(token text) signature", and added `console.error`
+logging in the same commit. `token` comes from `useParams()` and is already a
+string, so `String(token)` is a no-op and the JSON body is byte-identical either
+way. Someone was debugging a failing call, guessed at a type mismatch, and the
+guess could not have changed anything. The error has been going to the console
+only ever since.
+
+**Keep the `text` overload, drop the `uuid` one:**
+
+- `InvoicePublic.jsx:40` sends a JSON string, which matches `text` directly.
+  Application code is frozen, so the surviving overload has to be the one the
+  app already calls.
+- The `text` body uses `view_token::text = token`, which returns zero rows on a
+  malformed token. The `uuid` body would raise `invalid input syntax for type
+  uuid` on the same input.
+- It matches `invoice_by_token`, which also casts on the column side.
+
+Dropping it **changes behaviour**: click counting starts working, so `view_count`
+and `first_viewed_at` begin moving for the first time since at least June.
+Historical counts stay at zero and are not recoverable.
+
+No caller in this repo passes a uuid-typed argument — the only two call sites are
+`InvoicePublic.jsx:40` and `:48`, both sending strings. Callers outside this repo
+(other apps on the shared project, Edge Functions, dashboard snippets) are not
+visible from here and should be checked before dropping.
 
 ### 2. Missing `SET search_path` on the `increment_invoice_*` functions
 
-All three are `security definer` without a pinned `search_path`. Standard
-hardening for definer functions. Not exploitable here — `anon` cannot create
-objects to shadow anything on the path — so this is hygiene, not an incident.
+All three are `security definer` without a pinned `search_path`, and their bodies
+reference `invoices` unqualified. Standard hardening for definer functions. Not
+exploitable here — `anon` reaches the database only through PostgREST and cannot
+execute the arbitrary SQL that shadowing an object would require — so this is
+hygiene, not an incident.
+
+`alter function ... set search_path = public, pg_temp` is sufficient; the setting
+applies for the duration of the call whatever the caller's path is. Note
+`pg_temp` explicitly **last**: if it is not listed, PostgreSQL searches the
+temporary schema *first* for relations, which is the exact hijack the setting is
+meant to prevent. `invoice_by_token` currently has `set search_path = public`
+without `pg_temp` and would ideally get the same treatment — it is already immune
+because its body schema-qualifies every reference, which is the belt to the
+setting's braces.
 
 ### 3. Token rotation for pre-2026-08-03 invoices
 
-Every invoice that existed before the fix had its `view_token` readable by
-anyone holding the publishable key. Rotating tokens invalidates links clients
-already hold, which means re-sending those invoices. Business decision, not yet
-made.
+Every invoice that existed before the fix had its `view_token` readable by anyone
+holding the publishable key, for as long as the `(view_token IS NOT NULL)` policy
+was in place. The key ships in the client bundle, so "anyone" means any visitor
+who opened the app in a browser, plus anyone who read the deployed JavaScript.
+
+Rotation would mean: `update public.invoices set view_token = gen_random_uuid()`
+across the affected rows, which **invalidates every link already in a client's
+inbox**. Those invoices then have to be re-sent from `InvoiceView.jsx`, one at a
+time, each consuming EmailJS quota and each landing as a second email about an
+invoice the client already received. Clients who kept the original link — or
+bookmarked it, or forwarded it to a bookkeeper — get "Invoice Not Found" with no
+explanation unless the re-send says so.
+
+The counterfactual cost is unknown: whether anyone actually harvested tokens
+while the policy was live cannot be determined after the fact, because PostgREST
+request logs for that window would need checking and anonymous reads of a public
+table are indistinguishable from ordinary viewer traffic in them.
+
+Not decided. Business call, deliberately left open.
 
 ### 4. No unique index on `invoices.view_token`
 
