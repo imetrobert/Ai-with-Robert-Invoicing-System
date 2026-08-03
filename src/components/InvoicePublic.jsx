@@ -44,9 +44,14 @@ export default function InvoicePublic() {
   async function handlePDF() {
     setPdfLoading(true)
     try {
-      await generateInvoicePDF(invoice)
+      // Recorded before the PDF is generated, not after. generateInvoicePDF ends
+      // in doc.save(), which on iOS hands the file to Safari and suspends this
+      // page — killing any request still in flight, so the count never landed.
+      // The trade is that this counts a download that started rather than one
+      // that finished.
       const { error: rpcError } = await supabase.rpc('increment_invoice_pdf_download', { token: String(token) })
       if (rpcError) console.error('PDF RPC error:', rpcError)
+      await generateInvoicePDF(invoice)
     }
     catch (e) { alert('PDF generation failed: ' + e.message) }
     setPdfLoading(false)

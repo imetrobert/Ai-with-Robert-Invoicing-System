@@ -23,11 +23,32 @@ A private, secure invoicing web app for [AIWithRobert.com](https://aiwithrobert.
 
 1. Go to [supabase.com](https://supabase.com) → **New Project**
 2. Choose a name (e.g. `aiwithrobert-invoicing`) and a strong DB password
-3. Once created, go to **SQL Editor** and paste the contents of `supabase-setup.sql` → **Run**
+3. Create the schema — see **Database schema** below
 4. Go to **Authentication → Users → Add User** → create your login email + password
 5. Go to **Project Settings → API** and copy:
    - **Project URL** (looks like `https://abcdefg.supabase.co`)
-   - **anon public** key
+   - **publishable** key (formerly labelled **anon public**)
+
+#### Database schema
+
+Earlier revisions of this README told you to run a `supabase-setup.sql`. **That
+file has never existed in this repo** — `git log --all --diff-filter=A` confirms
+it was never committed. The `invoices` and `survey_responses` tables, their RLS
+policies, and the `increment_invoice_*` functions were all created by hand in the
+Supabase SQL editor, so there is currently **no baseline schema in version
+control** and a new project cannot be built from this repo alone.
+
+`supabase/migrations/` holds only changes made since 2026-08-03, which assume the
+tables already exist. To capture the real baseline, dump it from the live project
+and commit the result as the first migration:
+
+```bash
+supabase db dump --db-url "$SUPABASE_DB_URL" --schema public -f supabase/migrations/00000000000000_baseline.sql
+```
+
+Note that the project is shared with other apps, so a `public` dump includes
+tables this app does not use (`etf_*`, `job_*`). Trim it, or dump only the tables
+this app owns.
 
 ### Step 2 — Configure the Vite base path
 
@@ -94,7 +115,8 @@ src/
 │   ├── Navbar.jsx         # Top navigation
 │   ├── Dashboard.jsx      # Invoice list + stats
 │   ├── InvoiceForm.jsx    # Create / edit invoice
-│   └── InvoiceView.jsx    # View + PDF download + delete
+│   ├── InvoiceView.jsx    # View + PDF download + delete
+│   └── InvoicePublic.jsx  # Tokenized client view — see SECURITY.md
 ├── lib/
 │   ├── supabase.js        # Supabase client
 │   ├── services.js        # Pre-loaded services from your site
@@ -103,6 +125,11 @@ src/
 ├── App.jsx                # Router + auth guard
 ├── main.jsx               # Entry point
 └── index.css              # Global styles
+
+supabase/
+└── migrations/            # Schema changes since 2026-08-03 (no baseline — see above)
+
+SECURITY.md                # Public viewer data access + open items
 ```
 
 ---
@@ -117,6 +144,21 @@ src/
 
 ## 🔒 Security Notes
 
-- Row Level Security (RLS) is enabled on Supabase — only authenticated users can read/write data.
+See **[SECURITY.md](SECURITY.md)** for how the public invoice viewer reads data
+and for the current open items.
+
+- Row Level Security (RLS) is enabled on Supabase. Every table read by the
+  logged-in app requires authentication.
+- **The public invoice viewer is the one unauthenticated read**, and it does
+  **not** query the `invoices` table with a `view_token` filter. It calls
+  `invoice_by_token(token text)`, a `security definer` function that takes the
+  token as an argument. RLS can only see the row, never the request's filter, so
+  a policy cannot check that the caller supplied the right token — scoping
+  expressed as a request filter is scoping the caller can simply remove. If you
+  add another public read, follow the same pattern; the reasoning is in
+  [SECURITY.md](SECURITY.md) and in
+  `supabase/migrations/20260803120000_invoice_by_token_rpc.sql`.
+- The public viewer returns a whitelisted column set. `view_token`, `email_log`,
+  `emailed_at` and the view/download counters are never sent to the client.
 - The app is not indexed by search engines (`<meta name="robots" content="noindex, nofollow" />`).
 - Your Supabase credentials are stored as GitHub Secrets and never committed to the repo.
