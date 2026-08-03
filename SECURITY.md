@@ -39,12 +39,13 @@ and the exact SQL.
 Current shape:
 
 - `public.invoice_by_token(token text)` — `security definer`, `stable`,
-  `set search_path = public`. Executable by `anon` and `authenticated`.
+  `set search_path = public, pg_temp`. Executable by `anon` and `authenticated`.
 - Returns `setof public.invoice_public_v`, a view that fixes the client-facing
-  column list. `view_token`, `email_log`, `emailed_at` and the view/download
-  counters are not in it.
-- The view itself is revoked from `anon` and `authenticated`. It must stay that
-  way — see open item 3.
+  column list. `view_token`, `email_log`, `emailed_at`, `updated_at` and the
+  view/download counters are not in it.
+- The view carries `security_invoker = on`, so it is subject to the caller's own
+  RLS rather than its owner's rights. It is also revoked from `anon` and
+  `authenticated` — keep both.
 - A malformed or empty token returns zero rows rather than raising, so the app's
   existing "Invoice Not Found" screen handles it.
 - `invoices.view_token` is a `uuid` column. Inferred, not queried: the
@@ -147,9 +148,28 @@ PostgreSQL searches the temporary schema *first* for relation names, which is th
 exact hijack the setting exists to prevent. A bare `search_path = public`, which
 is what `invoice_by_token` originally had, does not close that.
 
+### `invoice_public_v` no longer depends only on a revoke (done)
+
+The view is exposed by PostgREST at `/rest/v1/invoice_public_v` and, like any
+view, ran with its owner's rights — so it read `invoices` without RLS applying,
+and the only thing keeping it shut was an explicit
+`revoke all ... from anon, authenticated, public`. A later blanket
+`grant select on all tables in schema public to anon`, or a tool re-applying
+Supabase's default privileges, would have silently turned it into a full read of
+every invoice minus the token, with no policy change to notice in an audit.
+
+`alter view public.invoice_public_v set (security_invoker = on)` now makes the
+view subject to the caller's own RLS, so it defends itself. `invoice_by_token`
+still works because it is `security definer` and runs as `postgres`, which owns
+`invoices` and is not under `FORCE ROW LEVEL SECURITY` — confirmed by the fact
+that it already read the table successfully with no anonymous policy present.
+Verified after the change by loading a real invoice link.
+
+The revoke was kept as well: belt and braces, not one replacing the other.
+
 ## Open items
 
-Both are decisions rather than defects. Neither has been actioned.
+Recorded deliberately, not actioned.
 
 ### 1. Token rotation for pre-2026-08-03 invoices
 
@@ -172,21 +192,6 @@ request logs for that window would need checking and anonymous reads of a public
 table are indistinguishable from ordinary viewer traffic in them.
 
 Not decided. Business call, deliberately left open.
-
-### 2. `invoice_public_v` depends on a revoke that nothing enforces
-
-The view is exposed by PostgREST at `/rest/v1/invoice_public_v` and, like any
-view, runs with its owner's rights — so it reads `invoices` without RLS applying.
-The only thing keeping it closed is the explicit
-`revoke all on table public.invoice_public_v from anon, authenticated, public`
-in the migration. A later blanket `grant select on all tables in schema public
-to anon`, or a tool that re-applies default privileges, would silently turn it
-into a full read of every invoice minus the token.
-
-On PostgreSQL 15+, `alter view public.invoice_public_v set (security_invoker =
-on)` makes the view respect the caller's own RLS, which removes the dependency
-on the revoke. `invoice_by_token` keeps working because it runs as its definer
-owner. Worth confirming the server version before relying on it.
 
 ## Reporting
 
