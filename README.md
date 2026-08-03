@@ -31,24 +31,34 @@ A private, secure invoicing web app for [AIWithRobert.com](https://aiwithrobert.
 
 #### Database schema
 
-Earlier revisions of this README told you to run a `supabase-setup.sql`. **That
-file has never existed in this repo** — `git log --all --diff-filter=A` confirms
-it was never committed. The `invoices` and `survey_responses` tables, their RLS
-policies, and the `increment_invoice_*` functions were all created by hand in the
-Supabase SQL editor, so there is currently **no baseline schema in version
-control** and a new project cannot be built from this repo alone.
+Run **`supabase/schema.sql`** in the SQL editor. It creates the `invoices` table,
+its indexes, its `updated_at` trigger, the row level security policy, the
+client-facing `invoice_public_v` view, and the three functions the app calls.
 
-`supabase/migrations/` holds only changes made since 2026-08-03, which assume the
-tables already exist. To capture the real baseline, dump it from the live project
-and commit the result as the first migration:
+Two things to know about it:
+
+- It is a **snapshot of the live database taken on 2026-08-03**, not a historical
+  baseline. Run it on an empty project and you get current structure directly —
+  there is no need to replay `supabase/migrations/` on top. Those files are the
+  record of what changed on 2026-08-03 and why, kept for the reasoning rather
+  than for replay.
+- It covers **this app only**. The Supabase project is shared, so other apps'
+  tables (`etf_*`, `job_*`, `profiles`) are absent, and so is `survey_responses`
+  — used by this app's survey screens, but part of separate authorization work.
+  It is not a complete backup of the project.
+
+Earlier revisions of this README told you to run a `supabase-setup.sql`. That
+file has never existed in this repo — `git log --all --diff-filter=A` confirms it
+was never committed. The schema was built by hand in the SQL editor over time and
+was reconstructed into `schema.sql` from catalog queries.
+
+If you have a terminal and the database URL, `supabase db dump` produces a more
+authoritative export than a hand-reconstruction, and is worth doing when
+convenient:
 
 ```bash
-supabase db dump --db-url "$SUPABASE_DB_URL" --schema public -f supabase/migrations/00000000000000_baseline.sql
+supabase db dump --db-url "$SUPABASE_DB_URL" --schema public -f supabase/schema.sql
 ```
-
-Note that the project is shared with other apps, so a `public` dump includes
-tables this app does not use (`etf_*`, `job_*`). Trim it, or dump only the tables
-this app owns.
 
 ### Step 2 — Configure the Vite base path
 
