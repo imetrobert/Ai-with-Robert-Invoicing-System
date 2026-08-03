@@ -24,15 +24,16 @@ export default function InvoicePublic() {
   }, [token])
 
   async function fetchAndTrack() {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .eq('view_token', token)
-      .single()
+    // Fetched via RPC, not a table filter: RLS can only see the row, so a
+    // view_token=eq.<token> filter is scoping the caller supplies and can drop.
+    // invoice_by_token(token text) takes the token as an argument instead, so
+    // the database does the scoping. Empty array = no invoice for that token.
+    const { data, error } = await supabase.rpc('invoice_by_token', { token: String(token) })
+    const record = Array.isArray(data) ? data[0] : data
 
-    if (error || !data) { setNotFound(true); setLoading(false); return }
+    if (error || !record) { setNotFound(true); setLoading(false); return }
 
-    setInvoice(data)
+    setInvoice(record)
     setLoading(false)
 
     // Explicitly cast token to string to match increment_invoice_view(token text) signature
