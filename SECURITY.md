@@ -120,7 +120,10 @@ because it fires during page load with nothing interrupting it.
 
 Fixed by recording the download *before* generating the PDF. The trade is that a
 started download is counted rather than a finished one; a PDF that fails to
-generate now counts anyway. Not confirmed on desktop, where `doc.save()` does not
+generate now counts anyway.
+
+Verified on iOS after deploying the change: `pdf_download_count` moved `0 -> 1`
+on the first download. Never reproduced on desktop, where `doc.save()` does not
 navigate away — the reorder is correct either way.
 
 ### Unique index on `invoices.view_token` (added)
@@ -131,28 +134,24 @@ prevents that. Built non-concurrently after `CREATE INDEX CONCURRENTLY` failed
 inside the SQL editor's implicit transaction; the table is small enough that the
 brief lock was irrelevant.
 
+### `SET search_path` pinned on every definer function (done)
+
+The three `increment_invoice_*` functions ran as `security definer` with no
+pinned `search_path` and unqualified references to `invoices`. Not exploitable —
+`anon` reaches the database only through PostgREST and cannot execute the
+arbitrary SQL that shadowing an object would require — so this was hygiene.
+
+All now carry `search_path=public, pg_temp`, `invoice_by_token` included.
+`pg_temp` is listed **last** deliberately: when it is not listed at all,
+PostgreSQL searches the temporary schema *first* for relation names, which is the
+exact hijack the setting exists to prevent. A bare `search_path = public`, which
+is what `invoice_by_token` originally had, does not close that.
+
 ## Open items
 
-Recorded deliberately, none actioned. Each is a separate decision.
+Both are decisions rather than defects. Neither has been actioned.
 
-### 1. Missing `SET search_path` on the `increment_invoice_*` functions
-
-All three are `security definer` without a pinned `search_path`, and their bodies
-reference `invoices` unqualified. Standard hardening for definer functions. Not
-exploitable here — `anon` reaches the database only through PostgREST and cannot
-execute the arbitrary SQL that shadowing an object would require — so this is
-hygiene, not an incident.
-
-`alter function ... set search_path = public, pg_temp` is sufficient; the setting
-applies for the duration of the call whatever the caller's path is. Note
-`pg_temp` explicitly **last**: if it is not listed, PostgreSQL searches the
-temporary schema *first* for relations, which is the exact hijack the setting is
-meant to prevent. `invoice_by_token` currently has `set search_path = public`
-without `pg_temp` and would ideally get the same treatment — it is already immune
-because its body schema-qualifies every reference, which is the belt to the
-setting's braces.
-
-### 2. Token rotation for pre-2026-08-03 invoices
+### 1. Token rotation for pre-2026-08-03 invoices
 
 Every invoice that existed before the fix had its `view_token` readable by anyone
 holding the publishable key, for as long as the `(view_token IS NOT NULL)` policy
@@ -174,7 +173,7 @@ table are indistinguishable from ordinary viewer traffic in them.
 
 Not decided. Business call, deliberately left open.
 
-### 3. `invoice_public_v` depends on a revoke that nothing enforces
+### 2. `invoice_public_v` depends on a revoke that nothing enforces
 
 The view is exposed by PostgREST at `/rest/v1/invoice_public_v` and, like any
 view, runs with its owner's rights — so it reads `invoices` without RLS applying.
