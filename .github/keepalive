@@ -1,0 +1,5 @@
+# Keepalive marker — updated monthly by an automated job.
+# Its only purpose is to create repository activity so GitHub does not
+# auto-disable the "Supabase Keep-Alive" scheduled workflow after 60 days
+# of inactivity.
+last_updated: 2026-09-26
