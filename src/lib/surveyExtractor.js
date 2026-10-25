@@ -1,9 +1,9 @@
 // src/lib/surveyExtractor.js
-// Uses Gemini 2.5 Flash to extract survey fields from a PDF or image.
-// Free tier: 15 req/min, 1500 req/day — more than enough for workshop volumes.
+// Uses Gemini 3.5 Flash Lite to extract survey fields from a PDF or image.
+// Free tier: Lite models carry the larger daily pool — more than enough for workshop volumes.
 
 const GEMINI_API_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent'
 
 const EXTRACTION_PROMPT = `You are extracting data from a handwritten survey form for "AI with Robert" workshops. The form is filled in by hand by senior citizens, so marks are often shaky, oversized, uneven, or drawn slightly outside the lines — read carefully and go strictly by which shape a mark physically overlaps, never by assumptions about layout or reading order.
 
@@ -228,7 +228,7 @@ export async function extractSurveyFromFiles(files, apiKey) {
 
   const data = await response.json()
 
-  // Gemini 2.5 Flash may return "thinking" parts alongside text parts — collect only text
+  // The model may return "thinking" parts alongside text parts — collect only text
   const parts = data?.candidates?.[0]?.content?.parts || []
   const text = parts
     .filter(p => p.text && !p.thought)
