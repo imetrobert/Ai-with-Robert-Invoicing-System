@@ -61,6 +61,10 @@ create table if not exists public.invoices (
   -- Every send timestamp, not just the latest, so the dashboard's EmailJS quota
   -- tracker can count actual sends per cycle rather than distinct invoices.
   email_log          jsonb                    not null default '[]'::jsonb,
+  -- Added 2026-11-10 (see migrations/20261110180000_add_brand_and_client_company.sql)
+  brand              text                     not null default 'seniors'::text,
+  client_company     text,
+  constraint invoices_brand_check check (brand in ('seniors', 'business')),
   constraint invoices_pkey primary key (id),
   constraint invoices_invoice_number_key unique (invoice_number)
 );
@@ -72,6 +76,7 @@ create table if not exists public.invoices (
 create index if not exists idx_invoices_client_name on public.invoices using btree (client_name);
 create index if not exists idx_invoices_created_at  on public.invoices using btree (created_at desc);
 create index if not exists idx_invoices_status      on public.invoices using btree (status);
+create index if not exists idx_invoices_brand       on public.invoices using btree (brand);
 
 -- Added 2026-08-03. InvoicePublic.jsx takes data[0] rather than .single(), so
 -- two rows sharing a token would silently render one client's invoice to
@@ -166,7 +171,9 @@ with (security_invoker = on) as
     gst_amount,
     total,
     notes,
-    status
+    status,
+    brand,
+    client_company
    from invoices;
 
 revoke all on table public.invoice_public_v from anon, authenticated, public;

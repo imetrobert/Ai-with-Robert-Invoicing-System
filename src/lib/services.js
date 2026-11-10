@@ -56,3 +56,13 @@ export const SERVICES = [
     unitLabel: '',
   },
 ]
+
+// Business invoices are open-ended: each line is a service name, a description,
+// a quantity and a rate, so there is no fixed price list yet. To add a saved
+// catalog later, add entries here (same shape as SERVICES); the Business form
+// then shows a "Quick add" picker above the open-ended fields automatically.
+export const BUSINESS_SERVICES = []
+
+export function getServices(brand) {
+  return brand === 'business' ? BUSINESS_SERVICES : SERVICES
+}

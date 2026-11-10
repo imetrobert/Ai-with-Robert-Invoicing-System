@@ -172,3 +172,13 @@ and for the current open items.
   `emailed_at` and the view/download counters are never sent to the client.
 - The app is not indexed by search engines (`<meta name="robots" content="noindex, nofollow" />`).
 - Your Supabase credentials are stored as GitHub Secrets and never committed to the repo.
+
+## Two brands: Seniors & Business
+
+Invoices belong to a brand (`invoices.brand` = `seniors` | `business`). Brand config (logo, palette, tagline, number prefix) lives in `src/lib/brands.js`; bundled logos are in `public/logos/`.
+
+- Numbers: Seniors `AWR-YYYYMM-001`, Business `AWR-B-YYYYMM-001` (separate sequences).
+- Business invoices use open-ended lines (service, description, qty x rate) and an optional **Company name (Bill To)** (`invoices.client_company`). Same invoice-level discounts and taxes as Seniors.
+- Dashboard has an **All / Seniors / Business** toggle; each view has its own totals, and All adds a per-business breakdown. New Invoice opens on the brand being viewed (`/invoice/new?brand=business`).
+- To offer quick-pick Business services later, add entries to `BUSINESS_SERVICES` in `src/lib/services.js`.
+- **Database:** run `supabase/migrations/20261110180000_add_brand_and_client_company.sql` in the Supabase SQL editor BEFORE deploying this version. Existing invoices default to `seniors`.

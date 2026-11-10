@@ -1,15 +1,30 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { SERVICES } from '../lib/services'
+import { getServices } from '../lib/services'
+import { BRAND_LIST, DEFAULT_BRAND, brandOf } from '../lib/brands'
 import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES } from '../lib/invoiceUtils'
 
-const EMPTY_LINE = () => ({
+// Business lines are open-ended (service name + description + qty x rate), so they
+// are stored as 'custom' lines — the same shape Seniors already uses for its
+// "Custom Service" option, which every total/PDF/email path already handles.
+const EMPTY_LINE = (brand = DEFAULT_BRAND) => ({
   _id: Math.random().toString(36).slice(2),
-  service_id: '', service_name: '', description: '',
+  service_id: brand === 'business' ? 'custom' : '', service_name: '', description: '',
   quantity: 1, people: 1, rate: 0,
 })
+
+const BRAND_KEY = 'invoiceBrand'
+function initialBrand(searchParams) {
+  const q = searchParams.get('brand')
+  if (q === 'seniors' || q === 'business') return q
+  try {
+    const saved = localStorage.getItem(BRAND_KEY)
+    if (saved === 'seniors' || saved === 'business') return saved
+  } catch (_) { /* storage unavailable */ }
+  return DEFAULT_BRAND
+}
 
 function NumInput({ value, onChange, min = '0', step = '1', style = {}, label }) {
   return (
@@ -102,13 +117,16 @@ export default function InvoiceForm() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEditing = Boolean(id)
+  const [searchParams] = useSearchParams()
 
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(isEditing)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const [brand, setBrand] = useState(() => (id ? DEFAULT_BRAND : initialBrand(searchParams)))
   const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [clientCompany, setClientCompany] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
   const [province, setProvince] = useState('')
@@ -117,7 +135,7 @@ export default function InvoiceForm() {
   const [addressCity, setAddressCity] = useState('')
   const [addressPostal, setAddressPostal] = useState('')
   const [serviceDate, setServiceDate] = useState(new Date().toISOString().split('T')[0])
-  const [lineItems, setLineItems] = useState([EMPTY_LINE()])
+  const [lineItems, setLineItems] = useState(() => [EMPTY_LINE(id ? DEFAULT_BRAND : initialBrand(searchParams))])
   const [discountType, setDiscountType] = useState('none')
   const [discountValue, setDiscountValue] = useState('')
   const [gstEnabled, setGstEnabled] = useState(false)
@@ -126,6 +144,7 @@ export default function InvoiceForm() {
 
   const [allClients, setAllClients] = useState([])
   const [nameSuggestions, setNameSuggestions]     = useState([])
+  const [companySuggestions, setCompanySuggestions] = useState([])
   const [emailSuggestions, setEmailSuggestions]   = useState([])
   const [addr1Suggestions, setAddr1Suggestions]   = useState([])
   const [addr2Suggestions, setAddr2Suggestions]   = useState([])
@@ -139,13 +158,18 @@ export default function InvoiceForm() {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     fetchClients()
     if (isEditing) loadInvoice()
-    else generateNumber()
   }, [id])
+
+  // New invoices: (re)generate the number whenever the brand changes, because each
+  // brand has its own sequence. Editing keeps the number it was created with.
+  useEffect(() => {
+    if (!isEditing) generateNumber(brand)
+  }, [id, brand])
 
   async function fetchClients() {
     const { data } = await supabase
       .from('invoices')
-      .select('client_name, client_email, address_line1, address_line2, address_city, address_postal, province, notes')
+      .select('client_name, client_company, client_email, address_line1, address_line2, address_city, address_postal, province, notes')
       .order('created_at', { ascending: false })
 
     if (!data) return
@@ -153,6 +177,7 @@ export default function InvoiceForm() {
 
     const unique = (arr) => [...new Set(arr.filter(Boolean))]
     setNameSuggestions(unique(data.map(r => r.client_name)))
+    setCompanySuggestions(unique(data.map(r => r.client_company)))
     setEmailSuggestions(unique(data.map(r => r.client_email)))
     setAddr1Suggestions(unique(data.map(r => r.address_line1)))
     setAddr2Suggestions(unique(data.map(r => r.address_line2)))
@@ -161,15 +186,28 @@ export default function InvoiceForm() {
     setNotesSuggestions(unique(data.map(r => r.notes)))
   }
 
-  async function generateNumber() {
+  async function generateNumber(forBrand) {
     const { data } = await supabase.from('invoices').select('invoice_number')
-    setInvoiceNumber(generateInvoiceNumber((data || []).map(r => r.invoice_number)))
+    setInvoiceNumber(generateInvoiceNumber((data || []).map(r => r.invoice_number), forBrand))
+  }
+
+  function changeBrand(next) {
+    if (isEditing || next === brand) return
+    setBrand(next)
+    try { localStorage.setItem(BRAND_KEY, next) } catch (_) { /* storage unavailable */ }
+    // Nothing entered yet -> start the new brand with a clean first line.
+    if (lineItems.every(l => !l.service_name)) setLineItems([EMPTY_LINE(next)])
+    else if (next === 'business') {
+      setLineItems(prev => prev.map(l => (l.service_name || l.service_id ? l : { ...l, service_id: 'custom' })))
+    }
   }
 
   async function loadInvoice() {
     const { data, error } = await supabase.from('invoices').select('*').eq('id', id).single()
     if (error || !data) { navigate('/'); return }
+    setBrand(brandOf(data).id)
     setInvoiceNumber(data.invoice_number)
+    setClientCompany(data.client_company || '')
     setClientName(data.client_name)
     setClientEmail(data.client_email || '')
     setProvince(data.province || '')
@@ -180,7 +218,7 @@ export default function InvoiceForm() {
     setServiceDate(data.service_date)
     setLineItems(data.services?.length
       ? data.services.map(s => ({ ...s, _id: Math.random().toString(36).slice(2), people: s.people || 1 }))
-      : [EMPTY_LINE()])
+      : [EMPTY_LINE(brandOf(data).id)])
     setDiscountType(data.discount_type || 'none')
     setDiscountValue(data.discount_value || '')
     setGstEnabled(data.gst_enabled || false)
@@ -198,6 +236,21 @@ export default function InvoiceForm() {
     // is this client's most recent invoice — use it as the source of truth
     // for auto-fill instead of requiring every past invoice to match exactly.
     const c = matches[0]
+    if (brand === 'business' && c.client_company) setClientCompany(c.client_company)
+    if (c.client_email)   setClientEmail(c.client_email)
+    if (c.address_line1)  setAddressLine1(c.address_line1)
+    setAddressLine2(c.address_line2 || '')
+    if (c.address_city)   setAddressCity(c.address_city)
+    if (c.address_postal) setAddressPostal(c.address_postal)
+    if (c.province)       setProvince(c.province)
+  }
+
+  // Business: picking a company fills the contact from that company's latest invoice.
+  function handleCompanySelect(company) {
+    setClientCompany(company)
+    const c = allClients.find(r => r.client_company === company)
+    if (!c) return
+    if (c.client_name)    setClientName(c.client_name)
     if (c.client_email)   setClientEmail(c.client_email)
     if (c.address_line1)  setAddressLine1(c.address_line1)
     setAddressLine2(c.address_line2 || '')
@@ -207,11 +260,17 @@ export default function InvoiceForm() {
   }
 
   function handleServiceSelect(idx, serviceId) {
-    const svc = SERVICES.find(s => s.id === serviceId)
-    setLineItems(prev => prev.map((item, i) => i !== idx ? item : {
-      ...item, service_id: serviceId,
-      service_name: svc?.name || '', description: svc?.description || '',
-      rate: svc?.rate || 0, quantity: 1, people: 1,
+    // Business "Custom" (empty id or 'custom') keeps the open-ended fields blank.
+    const svc = getServices(brand).find(s => s.id === serviceId)
+    setLineItems(prev => prev.map((item, i) => {
+      if (i !== idx) return item
+      // Business "Custom": keep whatever has been typed, just mark it open-ended.
+      if (!svc && brand === 'business') return { ...item, service_id: 'custom' }
+      return {
+        ...item, service_id: serviceId,
+        service_name: svc?.name || '', description: svc?.description || '',
+        rate: svc?.rate || 0, quantity: 1, people: 1,
+      }
     }))
   }
 
@@ -220,7 +279,7 @@ export default function InvoiceForm() {
     setLineItems(prev => prev.map((item, i) => i !== idx ? item : { ...item, [field]: v }))
   }
 
-  function addLine() { setLineItems(prev => [...prev, EMPTY_LINE()]) }
+  function addLine() { setLineItems(prev => [...prev, EMPTY_LINE(brand)]) }
   function removeLine(idx) {
     if (lineItems.length === 1) return
     setLineItems(prev => prev.filter((_, i) => i !== idx))
@@ -242,7 +301,8 @@ export default function InvoiceForm() {
     setSaving(true); setError('')
 
     const payload = {
-      invoice_number: invoiceNumber, client_name: clientName.trim(),
+      invoice_number: invoiceNumber, brand, client_name: clientName.trim(),
+      client_company: brand === 'business' ? (clientCompany.trim() || null) : null,
       client_email: clientEmail.trim() || null, province: province || null,
       address_line1: addressLine1.trim() || null,
       address_line2: addressLine2.trim() || null,
@@ -275,7 +335,7 @@ export default function InvoiceForm() {
       <Navbar session={session} />
       <div className="main-content">
         <div className="page-header">
-          <h1>{isEditing ? 'Edit Invoice' : 'New Invoice'}</h1>
+          <h1>{isEditing ? 'Edit Invoice' : 'New Invoice'} <span style={{ fontSize: 13, fontWeight: 700, color: brandOf(brand).accentText, marginLeft: 6 }}>· {brandOf(brand).label}</span></h1>
           <Link to={isEditing ? `/invoice/${id}` : '/'} className="btn btn-ghost btn-sm">Cancel</Link>
         </div>
 
@@ -286,6 +346,34 @@ export default function InvoiceForm() {
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="card-header"><h2>Invoice Details</h2></div>
             <div className="card-body">
+              <div className="form-group">
+                <label className="form-label">Brand</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {BRAND_LIST.map(b => {
+                    const active = b.id === brand
+                    return (
+                      <button
+                        key={b.id} type="button"
+                        onClick={() => changeBrand(b.id)}
+                        disabled={isEditing && !active}
+                        aria-pressed={active}
+                        style={{
+                          flex: 1, padding: '10px 8px', borderRadius: 8, fontSize: 14, fontWeight: 700,
+                          cursor: isEditing ? 'default' : 'pointer',
+                          border: `2px solid ${active ? b.accent : 'var(--border)'}`,
+                          background: active ? b.tint : 'white',
+                          color: active ? b.accentText : 'var(--muted)',
+                          opacity: isEditing && !active ? 0.45 : 1,
+                        }}
+                      >
+                        {b.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {isEditing && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>The brand can't change on a saved invoice (it sets the invoice number).</div>}
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">Invoice #</label>
@@ -301,8 +389,19 @@ export default function InvoiceForm() {
                 </div>
               </div>
 
+              {brand === 'business' && (
+                <AutocompleteField
+                  label="Company Name"
+                  value={clientCompany}
+                  onChange={setClientCompany}
+                  onSelect={handleCompanySelect}
+                  suggestions={companySuggestions}
+                  placeholder="e.g. Tremblay & Associés inc."
+                />
+              )}
+
               <AutocompleteField
-                label="Client Name"
+                label={brand === 'business' ? 'Contact Name' : 'Client Name'}
                 required
                 inputRef={clientInputRef}
                 value={clientName}
@@ -381,20 +480,23 @@ export default function InvoiceForm() {
               <div className="line-items">
                 {lineItems.map((item, idx) => (
                   <div key={item._id} className="line-item">
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Service</label>
-                      <select className="form-control" value={item.service_id} onChange={e => handleServiceSelect(idx, e.target.value)}>
-                        <option value="">— Select a service —</option>
-                        {SERVICES.map(s => (
-                          <option key={s.id} value={s.id}>{s.name} ({s.rate > 0 ? formatCAD(s.rate) + s.unitLabel : 'Free'})</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {item.service_id === 'custom' && (
+                    {/* Seniors always shows the price-list picker. Business shows it only once a catalog exists. */}
+                    {(brand !== 'business' || getServices(brand).length > 0) && (
                       <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label className="form-label">Custom Name</label>
-                        <input className="form-control" value={item.service_name} onChange={e => updateLine(idx, 'service_name', e.target.value)} placeholder="e.g. ChatGPT Setup" />
+                        <label className="form-label">{brand === 'business' ? 'Quick add' : 'Service'}</label>
+                        <select className="form-control" value={item.service_id} onChange={e => handleServiceSelect(idx, e.target.value)}>
+                          <option value="">{brand === 'business' ? '— Custom (type below) —' : '— Select a service —'}</option>
+                          {getServices(brand).map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.rate > 0 ? formatCAD(s.rate) + s.unitLabel : 'Free'})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {(item.service_id === 'custom' || brand === 'business') && (
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">{brand === 'business' ? 'Service' : 'Custom Name'}</label>
+                        <input className="form-control" value={item.service_name} onChange={e => updateLine(idx, 'service_name', e.target.value)} placeholder={brand === 'business' ? 'e.g. AI Opportunity Assessment' : 'e.g. ChatGPT Setup'} />
                       </div>
                     )}
 
@@ -416,7 +518,7 @@ export default function InvoiceForm() {
                         </>
                       ) : (
                         <>
-                          <NumInput label="Qty / Hrs" value={item.quantity} min="0.5" step="0.5" style={{ width: 80 }}
+                          <NumInput label="Qty / Hrs" value={item.quantity} min={brand === 'business' ? '0.25' : '0.5'} step={brand === 'business' ? '0.25' : '0.5'} style={{ width: 80 }}
                             onChange={e => updateLine(idx, 'quantity', e.target.value === '' ? '' : parseFloat(e.target.value))} />
                           <NumInput label="Rate (CAD)" value={item.rate} min="0" step="0.01" style={{ width: 100 }}
                             onChange={e => updateLine(idx, 'rate', e.target.value === '' ? '' : parseFloat(e.target.value))} />

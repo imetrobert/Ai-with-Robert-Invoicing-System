@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
+import { brandOf, brandCssVars, CONTACT } from '../lib/brands'
 
 export default function InvoicePublic() {
   const { token } = useParams()
@@ -69,7 +70,7 @@ export default function InvoicePublic() {
         <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
         <h2 style={{ fontFamily: "'Playfair Display', serif", color: 'var(--navy)', marginBottom: 8 }}>Invoice Not Found</h2>
         <p style={{ color: 'var(--muted)', fontSize: 14 }}>This invoice link may have expired or is no longer available. Please contact AI with Robert directly.</p>
-        <a href="mailto:invoices@aiwithrobert.com" style={{ display: 'inline-block', marginTop: 20, color: 'var(--blue)', fontSize: 14 }}>invoices@aiwithrobert.com</a>
+        <a href="mailto:invoices@aiwithrobert.com" style={{ display: 'inline-block', marginTop: 20, color: '#1F77AE', fontSize: 14 }}>invoices@aiwithrobert.com</a>
       </div>
     </div>
   )
@@ -77,16 +78,17 @@ export default function InvoicePublic() {
   const services = Array.isArray(invoice.services) ? invoice.services : []
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate = getProvinceTaxRate(invoice.province)
+  const brand = brandOf(invoice)
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: "'Source Sans 3', 'Segoe UI', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: "'Source Sans 3', 'Segoe UI', sans-serif", ...brandCssVars(brand) }}>
       {/* Top bar */}
       <div style={{ background: 'var(--navy)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src="https://aiwithrobert.com/logo.PNG" alt="AI with Robert" style={{ height: 32, borderRadius: 6 }} onError={e => e.target.style.display='none'} />
+          <img src={brand.logo} alt={brand.name} style={{ height: 32, width: 32, background: 'white', borderRadius: 6, padding: 2, objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
           <div style={{ color: 'white' }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600 }}>AI with Robert</div>
-            <div style={{ fontSize: 10, opacity: .7 }}>invoices.aiwithrobert.com</div>
+            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600 }}>{brand.name}</div>
+            <div style={{ fontSize: 10, opacity: .7 }}>{brand.tagline}</div>
           </div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={handlePDF} disabled={pdfLoading} style={{ flexShrink: 0 }}>
@@ -98,13 +100,13 @@ export default function InvoicePublic() {
       <div style={{ maxWidth: 700, margin: '0 auto', padding: '20px 16px' }}>
         <div className="card">
           {/* Brand header */}
-          <div style={{ background: 'linear-gradient(135deg, #153457 0%, #1e4a8a 100%)', padding: '20px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ background: brand.navy, borderBottom: `4px solid ${brand.accent}`, padding: '20px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img src="https://aiwithrobert.com/logo.PNG" alt="" style={{ height: 40, borderRadius: 6 }} onError={e => e.target.style.display='none'} />
+              <img src={brand.logo} alt="" style={{ height: 44, width: 44, background: 'white', borderRadius: 8, padding: 3, objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
               <div style={{ color: 'white' }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700 }}>AI with Robert</div>
-                <div style={{ fontSize: 11, opacity: .7 }}>invoices@aiwithrobert.com · 514-250-8491</div>
-                <div style={{ fontSize: 11, opacity: .7 }}>aiwithrobert.com</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700 }}>{brand.name}</div>
+                <div style={{ fontSize: 11, opacity: .7 }}>{CONTACT.email} · {CONTACT.phone}</div>
+                <div style={{ fontSize: 11, opacity: .7 }}>{brand.website}</div>
               </div>
             </div>
             <div style={{ textAlign: 'right', color: 'white' }}>
@@ -118,7 +120,8 @@ export default function InvoicePublic() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--blue)', fontWeight: 700, marginBottom: 6 }}>Bill To</div>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>{invoice.client_name}</div>
+                <div style={{ fontSize: 17, fontWeight: 700 }}>{invoice.client_company || invoice.client_name}</div>
+                {invoice.client_company && invoice.client_name && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Attn: {invoice.client_name}</div>}
                 {invoice.client_email && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{invoice.client_email}</div>}
                 {invoice.address_line1 && <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 3 }}>{invoice.address_line1}</div>}
                 {invoice.address_line2 && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{invoice.address_line2}</div>}
@@ -203,7 +206,7 @@ export default function InvoicePublic() {
         </div>
 
         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 13 }}>
-          Questions? Contact us at <a href="mailto:invoices@aiwithrobert.com" style={{ color: 'var(--blue)' }}>invoices@aiwithrobert.com</a>
+          Questions? Contact us at <a href={`mailto:${CONTACT.email}`} style={{ color: "var(--blue)" }}>{CONTACT.email}</a>
         </div>
       </div>
     </div>
