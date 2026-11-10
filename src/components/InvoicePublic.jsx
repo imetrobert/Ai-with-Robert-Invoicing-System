@@ -204,7 +204,7 @@ export default function InvoicePublic() {
           </div>
 
           {/* Footer */}
-          <div style={{ background: 'var(--navy)', color: 'rgba(255,255,255,.6)', textAlign: 'center', padding: '12px 20px', fontSize: 11 }}>
+          <div style={{ background: brand.accent, color: brand.navy, fontWeight: 600, textAlign: 'center', padding: '12px 20px', fontSize: 11 }}>
             {L('thanks')} —{' '}
             {invoice.gst_enabled ? L('taxAt', { label: taxLabel, rate: fmtPct(taxRate, lang) }) : L('taxNA')}
           </div>

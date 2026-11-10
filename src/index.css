@@ -50,11 +50,25 @@ html, body, #root {
   box-shadow: 0 2px 8px rgba(0,0,0,.2);
   position: sticky; top: 0; z-index: 100;
 }
-.navbar-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: white; }
-.navbar-logo { height: 30px; width: auto; border-radius: 6px; }
-.navbar-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; }
-.navbar-title span { font-weight: 300; opacity: .7; font-size: 11px; display: block; margin-top: -2px; }
-.navbar-actions { display: flex; align-items: center; gap: 8px; }
+.navbar-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: white; flex-shrink: 0; }
+.navbar-logo { height: 30px; width: 30px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+.navbar-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; white-space: nowrap; line-height: 1.2; }
+.navbar-sub { font-weight: 300; opacity: .7; font-size: 11px; display: block; }
+.navbar-actions { display: flex; align-items: center; gap: 4px; min-width: 0; margin-left: 8px; overflow-x: auto; scrollbar-width: none; }
+/* nav links */
+.nav-link { color: rgba(255,255,255,.8); font-size: 13px; font-weight: 600; text-decoration: none; padding: 4px 8px; }
+.navbar-actions::-webkit-scrollbar { display: none; }
+.navbar-actions a, .navbar-actions button { white-space: nowrap; flex-shrink: 0; }
+/* Phones: drop the long name so the logo + links fit without bleeding */
+@media (max-width: 479px) {
+  .navbar-name { display: none; }
+  .navbar { padding: 0 10px; }
+  .navbar-brand { gap: 6px; }
+  .navbar-actions { gap: 0; margin-left: 6px; }
+  .nav-link { font-size: 12px; padding: 4px 4px; }
+  .navbar-actions .btn { padding: 4px 7px; font-size: 12px; margin-left: 2px; }
+  .navbar-sub { opacity: 1; font-weight: 600; font-size: 13px; }
+}
 
 /* ── Buttons ── */
 .btn {
@@ -272,7 +286,8 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 }
 .totals-row.total {
   font-weight: 700; font-size: 17px; color: var(--navy);
-  border-bottom: none; padding-top: 12px;
+  border-bottom: none; padding: 12px 14px; margin-top: 6px; border-radius: 8px;
+  background: var(--blue-light, var(--navy));   /* brand accent (set per invoice) */
 }
 
 /* ── Services table ── */
@@ -291,13 +306,20 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 420px; }
 .data-table th {
-  background: var(--navy); color: white; text-align: left;
+  background: var(--blue-light, var(--navy)); color: var(--navy); text-align: left;
   padding: 9px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
   white-space: nowrap;
 }
 .data-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); }
 .data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:nth-child(even) td { background: var(--blue-pale, transparent); }
 .data-table tr:hover td { background: var(--bg); }
+/* Phones: fit all five columns without sideways scrolling */
+@media (max-width: 519px) {
+  .data-table { min-width: 0; font-size: 12px; }
+  .data-table th { padding: 8px 5px; font-size: 9.5px; letter-spacing: 0; }
+  .data-table td { padding: 8px 5px; }
+}
 
 /* ── Empty state ── */
 .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
