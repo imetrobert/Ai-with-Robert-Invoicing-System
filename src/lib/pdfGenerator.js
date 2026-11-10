@@ -173,9 +173,9 @@ function _drawServicesTable(doc, invoice, margin, startY = 96) {
         : (item.quantity || 1) * (item.rate || 0)
       return [item.service_name || '', item.description || '', qtyLabel, formatCAD(item.rate || 0), formatCAD(amount)]
     }),
-    headStyles:         { fillColor: BRAND.navy, textColor: BRAND.white, fontStyle: 'bold', fontSize: 8.5, cellPadding: 4 },
+    headStyles:         { fillColor: BRAND.accent, textColor: BRAND.navy, fontStyle: 'bold', fontSize: 8.5, cellPadding: 4 },
     bodyStyles:         { fontSize: 8.5, textColor: BRAND.dark, cellPadding: 3.5 },
-    alternateRowStyles: { fillColor: [241, 245, 249] },
+    alternateRowStyles: { fillColor: BRAND.lightBlue },
     columnStyles: {
       0: { cellWidth: 38, fontStyle: 'bold' },
       1: { cellWidth: 'auto' },
@@ -225,11 +225,11 @@ function _drawTotals(doc, invoice, margin, pageW) {
   doc.setDrawColor(...BRAND.lightBlue)
   doc.setLineWidth(0.5)
   doc.line(lc, ty - 2, rc, ty - 2)
-  doc.setFillColor(...BRAND.navy)
+  doc.setFillColor(...BRAND.accent)
   doc.roundedRect(totalsX, ty - 1, totalsW, 12, 2, 2, 'F')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.setTextColor(...BRAND.white)
+  doc.setTextColor(...BRAND.navy)
   doc.text('TOTAL DUE', lc, ty + 6.5)
   doc.text(formatCAD(invoice.total || 0), rc, ty + 6.5, { align: 'right' })
 }
@@ -254,16 +254,16 @@ function _drawFooter(doc, invoice, pageH, margin, pageW) {
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate  = getProvinceTaxRate(invoice.province)
 
-  doc.setFillColor(...BRAND.navy)
+  doc.setFillColor(...BRAND.accent)
   doc.rect(0, footY, pageW, 20, 'F')
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
-  doc.setTextColor(180, 200, 240)
+  doc.setTextColor(...BRAND.navy)
   const brand = brandOf(invoice)
   doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 5,  { align: 'center' })
   doc.text(CONTACT.address, pageW / 2, footY + 10, { align: 'center' })
   doc.text(`${brand.website}  ·  ${CONTACT.email}  ·  ${CONTACT.phone}`, pageW / 2, footY + 15, { align: 'center' })
-  doc.setTextColor(150, 170, 210)
+  doc.setTextColor(...BRAND.navy)
   doc.setFontSize(6.5)
   const taxNote = invoice.gst_enabled
     ? `${taxLabel} applied at ${taxRate}%`
