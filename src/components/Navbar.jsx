@@ -13,7 +13,7 @@ export default function Navbar({ session }) {
     <nav className="navbar">
       <Link to="/" className="navbar-brand">
         <img
-          src="https://aiwithrobert.com/logo.PNG"
+          src={`${import.meta.env.BASE_URL}logos/master.png`}
           alt="AI with Robert"
           className="navbar-logo"
           onError={e => { e.target.style.display = 'none' }}

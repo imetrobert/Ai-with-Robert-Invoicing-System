@@ -1,4 +1,5 @@
 import emailjs from '@emailjs/browser'
+import { brandOf, CONTACT } from './brands'
 import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from './invoiceUtils'
 
 const SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID
@@ -17,10 +18,12 @@ export async function sendInvoiceEmail(invoice) {
   const gstAmount      = invoice.gst_amount       ?? 0
   const total          = invoice.total            ?? 0
 
+  const brand = brandOf(invoice)
+  const attn = invoice.client_company ? `${invoice.client_name} (${invoice.client_company})` : invoice.client_name
   const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
-  const greeting = `Dear <strong>${invoice.client_name}</strong>,<br><br>
-Thank you for placing your trust with the AI with Robert team.<br>
+  const greeting = `Dear <strong>${attn}</strong>,<br><br>
+Thank you for placing your trust with the ${brand.name} team.<br>
 Please find below your invoice for <strong>${formatDate(invoice.service_date)}</strong>.`
 
   const statusBanner = isPaid
@@ -74,9 +77,9 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
 
         <!-- Header -->
         <tr>
-          <td style="background:linear-gradient(135deg,#1e293b 0%,#2563eb 100%);padding:32px 36px;text-align:center;">
-            <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;">AI with Robert</div>
-            <div style="font-size:13px;color:#93c5fd;margin-top:4px;">invoices@aiwithrobert.com</div>
+          <td style="background:${brand.navy};border-bottom:4px solid ${brand.accent};padding:32px 36px;text-align:center;">
+            <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;">${brand.name}</div>
+            <div style="font-size:13px;color:${brand.accent};margin-top:4px;">${CONTACT.email}</div>
           </td>
         </tr>
 
@@ -133,7 +136,7 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
                 ${taxRow}
                 <tr style="background:#f8fafc;">
                   <td colspan="4" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1e293b;">Total Due (CAD)</td>
-                  <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#2563eb;">${formatCAD(total)}</td>
+                  <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:${brand.accentText};">${formatCAD(total)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -144,7 +147,7 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
         <!-- Notes -->
         <tr>
           <td style="padding:0 36px 24px;">
-            <div style="background:#f8fafc;border-left:3px solid #2563eb;border-radius:4px;padding:12px 16px;">
+            <div style="background:#f8fafc;border-left:3px solid ${brand.accent};border-radius:4px;padding:12px 16px;">
               <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Notes</div>
               <div style="font-size:13px;color:#1e293b;">${invoice.notes}</div>
             </div>
@@ -155,7 +158,7 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
         <tr>
           <td style="padding:0 36px 32px;text-align:center;">
             <p style="margin:0 0 16px;font-size:14px;color:#64748b;">
-              You can also <a href="${publicUrl}" style="color:#2563eb;font-weight:600;text-decoration:underline;">view and download a PDF copy of your invoice</a>.
+              You can also <a href="${publicUrl}" style="color:${brand.accentText};font-weight:600;text-decoration:underline;">view and download a PDF copy of your invoice</a>.
             </p>
           </td>
         </tr>
@@ -163,8 +166,8 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
         <!-- Footer -->
         <tr>
           <td style="background:#1e293b;padding:24px 36px;text-align:center;">
-            <div style="font-size:13px;color:#94a3b8;">AI with Robert · Côte Saint-Luc, QC · invoices@aiwithrobert.com</div>
-            <div style="font-size:12px;color:#64748b;margin-top:6px;">© ${new Date().getFullYear()} AI with Robert. All rights reserved.</div>
+            <div style="font-size:13px;color:#94a3b8;">${brand.name} · Côte Saint-Luc, QC · ${CONTACT.email}</div>
+            <div style="font-size:12px;color:#64748b;margin-top:6px;">© ${new Date().getFullYear()} ${brand.name}. All rights reserved.</div>
           </td>
         </tr>
 

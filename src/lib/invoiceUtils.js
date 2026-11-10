@@ -1,9 +1,15 @@
-// Generate invoice number: AWR-YYYYMM-XXX
-export function generateInvoiceNumber(existingNumbers = []) {
+import { brandOf, DEFAULT_BRAND } from './brands'
+
+// Generate invoice number. Each brand has its own sequence and prefix:
+//   seniors  -> AWR-YYYYMM-001
+//   business -> AWR-B-YYYYMM-001
+// The prefix always ends with "-YYYYMM-", so the seniors prefix can never match
+// a business number (the "B-" sits before the date) and vice versa.
+export function generateInvoiceNumber(existingNumbers = [], brand = DEFAULT_BRAND) {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
-  const prefix = `AWR-${year}${month}-`
+  const prefix = `${brandOf(brand).numberPrefix}${year}${month}-`
   const existing = existingNumbers
     .filter(n => n && n.startsWith(prefix))
     .map(n => parseInt(n.replace(prefix, '')) || 0)

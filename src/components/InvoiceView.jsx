@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
+import { brandOf, brandCssVars, CONTACT } from '../lib/brands'
 import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 
 export default function InvoiceView() {
@@ -89,6 +90,7 @@ export default function InvoiceView() {
   const services = Array.isArray(invoice.services) ? invoice.services : []
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate = getProvinceTaxRate(invoice.province)
+  const brand = brandOf(invoice)
 
   return (
     <div className="app-layout">
@@ -134,13 +136,13 @@ export default function InvoiceView() {
           <div className={`alert alert-${emailMsg.type === 'success' ? 'success' : 'error'}`}>{emailMsg.text}</div>
         )}
 
-        <div className="card">
-          <div style={{ background: 'linear-gradient(135deg, var(--navy) 0%, #1e4a8a 100%)', padding: '20px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="card" style={brandCssVars(brand)}>
+          <div style={{ background: brand.navy, borderBottom: `4px solid ${brand.accent}`, padding: '20px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <img src="https://aiwithrobert.com/logo.PNG" alt="" style={{ height: 38, borderRadius: 6 }} onError={e => e.target.style.display='none'} />
+              <img src={brand.logo} alt="" style={{ height: 42, width: 42, background: 'white', borderRadius: 8, padding: 3, objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
               <div style={{ color: 'white' }}>
-                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700 }}>AI with Robert</div>
-                <div style={{ fontSize: 11, opacity: .7 }}>invoices@aiwithrobert.com · aiwithrobert.com</div>
+                <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700 }}>{brand.name}</div>
+                <div style={{ fontSize: 11, opacity: .7 }}>{CONTACT.email} · {brand.website}</div>
               </div>
             </div>
             <div style={{ textAlign: 'right', color: 'white' }}>
@@ -153,7 +155,8 @@ export default function InvoiceView() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
               <div>
                 <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--blue)', fontWeight: 700, marginBottom: 4 }}>Bill To</div>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>{invoice.client_name}</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{invoice.client_company || invoice.client_name}</div>
+                {invoice.client_company && invoice.client_name && <div style={{ color: 'var(--muted)', fontSize: 12 }}>Attn: {invoice.client_name}</div>}
                 {invoice.client_email && <div style={{ color: 'var(--muted)', fontSize: 12 }}>{invoice.client_email}</div>}
                 {(invoice.address_line1 || invoice.address_city) && (
                   <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
@@ -227,7 +230,7 @@ export default function InvoiceView() {
           </div>
 
           <div style={{ background: 'var(--navy)', color: 'rgba(255,255,255,.6)', textAlign: 'center', padding: '10px 16px', fontSize: 11 }}>
-            Thank you for choosing AI with Robert! —{' '}
+            Thank you for choosing {brand.name}! —{' '}
             {invoice.gst_enabled ? `${taxLabel} at ${taxRate}%` : 'GST/QST/HST not applicable at this time.'}
           </div>
         </div>

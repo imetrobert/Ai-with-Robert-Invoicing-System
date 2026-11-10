@@ -1,23 +1,41 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatCAD, formatDate, utcToETDateStr, getProvinceTaxLabel, getProvinceTaxRate } from './invoiceUtils'
+import { brandOf, hexToRgb, CONTACT } from './brands'
 
-const BRAND = {
-  navy:      [21, 52, 95],
-  blue:      [37, 99, 235],
-  lightBlue: [219, 234, 254],
+// Neutral colours shared by both brands.
+const BASE = {
   gray:      [100, 116, 139],
   lightGray: [248, 250, 252],
   dark:      [15, 23, 42],
   white:     [255, 255, 255],
 }
 
+// Per-invoice palette: navy is shared; accent/lightBlue/blue come from the brand.
+// `BRAND` is reassigned at the start of each generateInvoicePDF() call so the
+// drawing helpers below can keep reading BRAND.* unchanged.
+let BRAND = buildPalette('seniors')
+function buildPalette(brandId) {
+  const b = brandOf(brandId)
+  return {
+    ...BASE,
+    navy:      hexToRgb(b.navy),
+    blue:      hexToRgb(b.accentText),   // labels / lines (text-safe)
+    accent:    hexToRgb(b.accent),       // header rule
+    lightBlue: hexToRgb(b.tint),
+  }
+}
+
 // ── Logo helpers ─────────────────────────────────────────────────────────────
 
-async function fetchLogoFull() {
+// Brand logos are bundled with the app (public/logos/), so they load from this
+// site's own origin — no cross-site dependency that can disappear.
+async function fetchLogoFull(brand) {
   try {
-    const res  = await fetch('https://aiwithrobert.com/logo.PNG')
+    const res = await fetch(brand.logo)
+    if (!res.ok) return null
     const blob = await res.blob()
+    if (!blob.type.startsWith('image/')) return null
     return await blobToBase64(blob)
   } catch (_) { return null }
 }
@@ -37,16 +55,20 @@ function createDoc() {
   return new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
 }
 
-function drawHeader(doc, pageW, margin, logoData) {
+function drawHeader(doc, pageW, margin, logoData, brand) {
   doc.setFillColor(...BRAND.lightGray)
   doc.rect(0, 0, pageW, doc.internal.pageSize.getHeight(), 'F')
   doc.setFillColor(...BRAND.navy)
   doc.rect(0, 0, pageW, 50, 'F')
-  doc.setFillColor(...BRAND.blue)
+  doc.setFillColor(...BRAND.accent)
   doc.rect(0, 50, pageW, 3, 'F')
 
+  // The logo mark is navy on transparent, so it sits on a white tile to stay
+  // visible against the navy header.
+  doc.setFillColor(...BRAND.white)
+  doc.roundedRect(margin, 8, 28, 28, 3, 3, 'F')
   if (logoData) {
-    doc.addImage(logoData, 'JPEG', margin, 8, 28, 28, undefined, 'FAST')
+    doc.addImage(logoData, 'PNG', margin + 2, 10, 24, 24, undefined, 'FAST')
   }
 
   doc.setTextColor(...BRAND.white)
@@ -56,9 +78,9 @@ function drawHeader(doc, pageW, margin, logoData) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(200, 220, 255)
-  doc.text('AI & Technology Training for Seniors', margin + 32, 27)
-  doc.text('5550 Lyndale, Cote Saint-Luc, Quebec  H4V 2L5', margin + 32, 33)
-  doc.text('invoices@aiwithrobert.com  ·  (514) 250-8491  ·  aiwithrobert.com', margin + 32, 39)
+  doc.text(brand.tagline, margin + 32, 27)
+  doc.text(CONTACT.address, margin + 32, 33)
+  doc.text(`${CONTACT.email}  ·  ${CONTACT.phone}  ·  ${brand.website}`, margin + 32, 39)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(26)
   doc.setTextColor(...BRAND.white)
@@ -66,8 +88,9 @@ function drawHeader(doc, pageW, margin, logoData) {
 }
 
 function drawBody(doc, invoice, margin, pageW) {
-  _drawMetaAndBillTo(doc, invoice, margin, pageW)
-  _drawServicesTable(doc, invoice, margin)
+  const billBottom = _drawMetaAndBillTo(doc, invoice, margin, pageW)
+  // Start the table below the Bill To block even when a company + attn line makes it taller.
+  _drawServicesTable(doc, invoice, margin, Math.max(96, billBottom + 8))
   _drawTotals(doc, invoice, margin, pageW)
   _drawNotes(doc, invoice, margin, pageW)
   _drawFooter(doc, invoice, doc.internal.pageSize.getHeight(), margin, pageW)
@@ -114,13 +137,16 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   doc.setFontSize(13)
   doc.setTextColor(...BRAND.dark)
   const maxNameWidth = col1 - margin - 8
-  const nameLines = doc.splitTextToSize(invoice.client_name || '', maxNameWidth)
+  // Business invoices bill a company: company name leads, contact person below it.
+  const company = invoice.client_company || ''
+  const nameLines = doc.splitTextToSize(company || invoice.client_name || '', maxNameWidth)
   doc.text(nameLines, margin, billY + 9)
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...BRAND.gray)
   let addressY = billY + 9 + (nameLines.length * 6)
+  if (company && invoice.client_name) { doc.text(`Attn: ${invoice.client_name}`, margin, addressY); addressY += 6 }
 
   if (invoice.client_email)  { doc.text(invoice.client_email,  margin, addressY); addressY += 6 }
   if (invoice.address_line1) { doc.text(invoice.address_line1, margin, addressY); addressY += 6 }
@@ -128,6 +154,7 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   const cityLine = [invoice.address_city, invoice.province, invoice.address_postal].filter(Boolean).join(', ')
   if (cityLine)             { doc.text(cityLine,              margin, addressY) }
   else if (invoice.province){ doc.text(invoice.province,      margin, addressY) }
+  return addressY
 }
 
 function _drawServicesTable(doc, invoice, margin, startY = 96) {
@@ -232,9 +259,10 @@ function _drawFooter(doc, invoice, pageH, margin, pageW) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7.5)
   doc.setTextColor(180, 200, 240)
+  const brand = brandOf(invoice)
   doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 5,  { align: 'center' })
-  doc.text('5550 Lyndale, Cote Saint-Luc, Quebec  H4V 2L5', pageW / 2, footY + 10, { align: 'center' })
-  doc.text('aiwithrobert.com  ·  invoices@aiwithrobert.com  ·  (514) 250-8491', pageW / 2, footY + 15, { align: 'center' })
+  doc.text(CONTACT.address, pageW / 2, footY + 10, { align: 'center' })
+  doc.text(`${brand.website}  ·  ${CONTACT.email}  ·  ${CONTACT.phone}`, pageW / 2, footY + 15, { align: 'center' })
   doc.setTextColor(150, 170, 210)
   doc.setFontSize(6.5)
   const taxNote = invoice.gst_enabled
@@ -249,8 +277,10 @@ export async function generateInvoicePDF(invoice) {
   const doc      = createDoc()
   const pageW    = doc.internal.pageSize.getWidth()
   const margin   = 20
-  const logoData = await fetchLogoFull()
-  drawHeader(doc, pageW, margin, logoData)
+  const brand    = brandOf(invoice)
+  BRAND = buildPalette(brand.id)
+  const logoData = await fetchLogoFull(brand)
+  drawHeader(doc, pageW, margin, logoData, brand)
   drawBody(doc, invoice, margin, pageW)
   const filename = `Invoice-${invoice.invoice_number}-${invoice.client_name?.replace(/\s+/g, '-')}.pdf`
   doc.save(filename)

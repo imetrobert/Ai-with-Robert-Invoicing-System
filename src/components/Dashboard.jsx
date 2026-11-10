@@ -3,6 +3,28 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 import { formatCAD, formatDateShort, STATUS_COLORS, utcToETDateStr } from '../lib/invoiceUtils'
+import { BRANDS, BRAND_LIST, brandOf } from '../lib/brands'
+
+// Totals for a list of invoices (paid = collected, everything else = outstanding)
+function summarize(list) {
+  const paid = list.filter(i => i.status === 'paid')
+  const open = list.filter(i => i.status !== 'paid')
+  return {
+    count: list.length,
+    collected: paid.reduce((s, i) => s + (i.total || 0), 0),
+    outstanding: open.reduce((s, i) => s + (i.total || 0), 0),
+    openCount: open.length,
+  }
+}
+
+function BrandBadge({ brand }) {
+  const b = brandOf(brand)
+  return (
+    <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 999, background: b.tint, color: b.accentText, border: `1px solid ${b.accent}`, letterSpacing: .3 }}>
+      {b.label}
+    </span>
+  )
+}
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -62,7 +84,7 @@ function escapeCSV(val) {
 
 function exportToCSV(invoices) {
   const headers = [
-    'Invoice #', 'Status', 'Client Name', 'Client Email',
+    'Invoice #', 'Brand', 'Status', 'Company Name', 'Client Name', 'Client Email',
     'Service Date', 'Created Date (ET)',
     'Province',
     'Address Line 1', 'Address Line 2', 'City', 'Postal Code',
@@ -74,7 +96,9 @@ function exportToCSV(invoices) {
 
   const rows = invoices.map(inv => [
     inv.invoice_number,
+    brandOf(inv).label,
     inv.status || 'draft',
+    inv.client_company || '',
     inv.client_name,
     inv.client_email || '',
     inv.service_date || '',
@@ -122,6 +146,9 @@ export default function Dashboard() {
   const navigate                      = useNavigate()
 
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [brandView, setBrandView]     = useState(() => {
+    try { const v = localStorage.getItem('dashboardBrandView'); return ['all', ...BRAND_LIST.map(b => b.id)].includes(v) ? v : 'all' } catch { return 'all' }
+  })
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [datePreset, setDatePreset]   = useState('all')
@@ -143,7 +170,7 @@ export default function Dashboard() {
     const { data, error } = await supabase
       .from('invoices')
       .select(`
-        id, invoice_number, client_name, client_email, service_date, created_at,
+        id, invoice_number, brand, client_company, client_name, client_email, service_date, created_at,
         total, subtotal, discount_type, discount_value, discount_amount,
         gst_enabled, gst_amount,
         province, address_line1, address_line2, address_city, address_postal,
@@ -171,13 +198,24 @@ export default function Dashboard() {
     }
   }
 
+  const brandInvoices = useMemo(
+    () => brandView === 'all' ? invoices : invoices.filter(i => brandOf(i).id === brandView),
+    [invoices, brandView]
+  )
+
+  function chooseBrandView(v) {
+    setBrandView(v)
+    try { localStorage.setItem('dashboardBrandView', v) } catch {}
+  }
+
   const filtered = useMemo(() => {
-    let result = invoices
+    let result = brandInvoices
 
     if (search.trim()) {
       const q = search.toLowerCase()
       result = result.filter(inv =>
         inv.client_name?.toLowerCase().includes(q) ||
+        inv.client_company?.toLowerCase().includes(q) ||
         inv.invoice_number?.toLowerCase().includes(q)
       )
     }
@@ -212,7 +250,7 @@ export default function Dashboard() {
     }
 
     return result
-  }, [invoices, search, statusFilter, clientFilter, datePreset, customFrom, customTo])
+  }, [brandInvoices, search, statusFilter, clientFilter, datePreset, customFrom, customTo])
 
   const activeFilterCount = [
     statusFilter !== 'all',
@@ -220,8 +258,10 @@ export default function Dashboard() {
     clientFilter.trim() !== '',
   ].filter(Boolean).length
 
-  const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total || 0), 0)
-  const outstanding  = invoices.filter(i => i.status !== 'paid').reduce((s, i) => s + (i.total || 0), 0)
+  const viewStats = summarize(brandInvoices)
+  const totalRevenue = viewStats.collected
+  const outstanding  = viewStats.outstanding
+  const perBrand = BRAND_LIST.map(b => ({ brand: b, ...summarize(invoices.filter(i => brandOf(i).id === b.id)) }))
 
   const emailsUsed = (() => {
     const nowET        = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Toronto' }))
@@ -264,8 +304,45 @@ export default function Dashboard() {
       <Navbar session={session} />
       <div className="main-content">
 
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, padding: 4, background: 'var(--border)', borderRadius: 12 }} role="tablist" aria-label="Business view">
+          {[{ id: 'all', label: 'All', count: invoices.length }, ...BRAND_LIST.map(b => ({ id: b.id, label: b.label, count: invoices.filter(i => brandOf(i).id === b.id).length, brand: b }))].map(t => {
+            const active = brandView === t.id
+            const accent = t.brand ? t.brand.accent : '#11304C'
+            return (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={active}
+                onClick={() => chooseBrandView(t.id)}
+                style={{ flex: 1, padding: '10px 6px', border: 'none', borderRadius: 9, cursor: 'pointer', fontWeight: 700, fontSize: 14, fontFamily: 'inherit',
+                  background: active ? 'white' : 'transparent', color: active ? '#11304C' : 'var(--muted)',
+                  boxShadow: active ? `0 1px 4px rgba(0,0,0,.15), inset 0 -3px 0 ${accent}` : 'none' }}
+              >
+                {t.label} <span style={{ fontWeight: 500, opacity: .7 }}>({t.count})</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {brandView === 'all' && (
+          <div className="card" style={{ padding: '10px 14px', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', marginBottom: 6 }}>Breakdown by business</div>
+            {perBrand.map(r => (
+              <div key={r.brand.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '6px 0', borderTop: '1px solid var(--border)', fontSize: 13 }}>
+                <span style={{ fontWeight: 700, color: r.brand.accentText }}>{r.brand.label} <span style={{ color: 'var(--muted)', fontWeight: 500 }}>· {r.count}</span></span>
+                <span style={{ textAlign: 'right' }}>
+                  <span style={{ color: 'var(--success)', fontWeight: 700 }}>{formatCAD(r.collected)}</span>
+                  <span style={{ color: 'var(--muted)' }}> paid · </span>
+                  <span style={{ color: r.outstanding > 0 ? 'var(--danger)' : 'var(--muted)', fontWeight: 700 }}>{formatCAD(r.outstanding)}</span>
+                  <span style={{ color: 'var(--muted)' }}> due</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="stats-grid">
-          <StatCard label="Invoices" value={invoices.length} />
+          <StatCard label={brandView === 'all' ? 'Invoices (both)' : `${BRANDS[brandView].label} invoices`} value={brandInvoices.length} />
           <StatCard label="Collected" value={formatCAD(totalRevenue)} accent />
           <StatCard label="Outstanding" value={formatCAD(outstanding)} warn={outstanding > 0} />
         </div>
@@ -292,8 +369,8 @@ export default function Dashboard() {
         </div>
 
         <div className="page-header">
-          <h1>Invoices</h1>
-          <Link to="/invoice/new" className="btn btn-primary btn-sm">
+          <h1>{brandView === 'all' ? 'All Invoices' : `${BRANDS[brandView].label} Invoices`}</h1>
+          <Link to={brandView === 'all' ? '/invoice/new' : `/invoice/new?brand=${brandView}`} className="btn btn-primary btn-sm">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             New Invoice
           </Link>
@@ -387,7 +464,7 @@ export default function Dashboard() {
                       {s.id === 'all' ? 'All statuses' : s.label}
                       {s.id !== 'all' && (
                         <span style={{ color: 'var(--muted)', fontWeight: 400, marginLeft: 2, fontSize: 11 }}>
-                          ({invoices.filter(i => (i.status || 'draft') === s.id).length})
+                          ({brandInvoices.filter(i => (i.status || 'draft') === s.id).length})
                         </span>
                       )}
                     </button>
@@ -495,7 +572,7 @@ export default function Dashboard() {
             fontSize: 13,
           }}>
             <span style={{ color: 'var(--blue)', fontWeight: 700 }}>
-              Showing {filtered.length} of {invoices.length} invoice{invoices.length !== 1 ? 's' : ''}
+              Showing {filtered.length} of {brandInvoices.length} invoice{brandInvoices.length !== 1 ? 's' : ''}
             </span>
             <span style={{ color: 'var(--muted)' }}>·</span>
             <span style={{ color: 'var(--success)', fontWeight: 600 }}>
@@ -543,9 +620,10 @@ export default function Dashboard() {
 
                   <div className="invoice-row-top">
                     <div style={{ minWidth: 0 }}>
-                      <div className="invoice-client">{inv.client_name}</div>
+                      <div className="invoice-client">{inv.client_company || inv.client_name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                         <span className="invoice-number">{inv.invoice_number}</span>
+                        {brandView === 'all' && <BrandBadge brand={inv} />}
                         <span className="invoice-date">{formatDateShort(inv.service_date)}</span>
                       </div>
                     </div>
