@@ -229,7 +229,7 @@ export default function InvoiceView() {
             </div>
           </div>
 
-          <div style={{ background: 'var(--navy)', color: 'rgba(255,255,255,.6)', textAlign: 'center', padding: '10px 16px', fontSize: 11 }}>
+          <div style={{ background: brand.accent, color: brand.navy, fontWeight: 600, textAlign: 'center', padding: '10px 16px', fontSize: 11 }}>
             Thank you for choosing {brand.name}! —{' '}
             {invoice.gst_enabled ? `${taxLabel} at ${taxRate}%` : 'GST/QST/HST not applicable at this time.'}
           </div>

@@ -19,27 +19,27 @@ export default function Navbar({ session }) {
           onError={e => { e.target.style.display = 'none' }}
         />
         <div className="navbar-title">
-          AI with Robert
-          <span>Invoicing</span>
+          <span className="navbar-name">AI with Robert</span>
+          <span className="navbar-sub">Invoicing</span>
         </div>
       </Link>
 
       <div className="navbar-actions">
         <Link
           to="/surveys"
-          style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
+          className="nav-link"
         >
           Surveys
         </Link>
         <Link
           to="/tax-summary"
-          style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
+          className="nav-link"
         >
           Tax Summary
         </Link>
         <Link
           to="/"
-          style={{ color: 'rgba(255,255,255,.8)', fontSize: 13, fontWeight: 600, textDecoration: 'none', padding: '4px 8px' }}
+          className="nav-link"
         >
           Invoices
         </Link>
