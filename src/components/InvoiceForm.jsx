@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
+import { LANGS } from '../lib/i18n'
 import { getServices } from '../lib/services'
 import { BRAND_LIST, DEFAULT_BRAND, brandOf } from '../lib/brands'
 import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES } from '../lib/invoiceUtils'
@@ -126,6 +127,7 @@ export default function InvoiceForm() {
 
   const [brand, setBrand] = useState(() => (id ? DEFAULT_BRAND : initialBrand(searchParams)))
   const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [language, setLanguage] = useState('en')
   const [clientCompany, setClientCompany] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
@@ -169,7 +171,7 @@ export default function InvoiceForm() {
   async function fetchClients() {
     const { data } = await supabase
       .from('invoices')
-      .select('client_name, client_company, client_email, address_line1, address_line2, address_city, address_postal, province, notes')
+      .select('client_name, client_company, client_email, address_line1, address_line2, address_city, address_postal, province, notes, language')
       .order('created_at', { ascending: false })
 
     if (!data) return
@@ -207,6 +209,7 @@ export default function InvoiceForm() {
     if (error || !data) { navigate('/'); return }
     setBrand(brandOf(data).id)
     setInvoiceNumber(data.invoice_number)
+    setLanguage(data.language === 'fr' ? 'fr' : 'en')
     setClientCompany(data.client_company || '')
     setClientName(data.client_name)
     setClientEmail(data.client_email || '')
@@ -236,6 +239,7 @@ export default function InvoiceForm() {
     // is this client's most recent invoice — use it as the source of truth
     // for auto-fill instead of requiring every past invoice to match exactly.
     const c = matches[0]
+    if (!isEditing && c.language) setLanguage(c.language === 'fr' ? 'fr' : 'en')
     if (brand === 'business' && c.client_company) setClientCompany(c.client_company)
     if (c.client_email)   setClientEmail(c.client_email)
     if (c.address_line1)  setAddressLine1(c.address_line1)
@@ -250,6 +254,7 @@ export default function InvoiceForm() {
     setClientCompany(company)
     const c = allClients.find(r => r.client_company === company)
     if (!c) return
+    if (!isEditing && c.language) setLanguage(c.language === 'fr' ? 'fr' : 'en')
     if (c.client_name)    setClientName(c.client_name)
     if (c.client_email)   setClientEmail(c.client_email)
     if (c.address_line1)  setAddressLine1(c.address_line1)
@@ -301,7 +306,7 @@ export default function InvoiceForm() {
     setSaving(true); setError('')
 
     const payload = {
-      invoice_number: invoiceNumber, brand, client_name: clientName.trim(),
+      invoice_number: invoiceNumber, brand, language, client_name: clientName.trim(),
       client_company: brand === 'business' ? (clientCompany.trim() || null) : null,
       client_email: clientEmail.trim() || null, province: province || null,
       address_line1: addressLine1.trim() || null,
@@ -372,6 +377,31 @@ export default function InvoiceForm() {
                   })}
                 </div>
                 {isEditing && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>The brand can't change on a saved invoice (it sets the invoice number).</div>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Invoice language</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {LANGS.map(l => {
+                    const active = l.id === language
+                    return (
+                      <button
+                        key={l.id} type="button"
+                        onClick={() => setLanguage(l.id)}
+                        aria-pressed={active}
+                        style={{
+                          flex: 1, padding: '10px 8px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                          border: `2px solid ${active ? 'var(--navy)' : 'var(--border)'}`,
+                          background: active ? 'var(--navy)' : 'white',
+                          color: active ? 'white' : 'var(--muted)',
+                        }}
+                      >
+                        {l.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Sets the language of the PDF, email and client link. Your own service names, descriptions and notes stay as you type them.</div>
               </div>
 
               <div className="form-row">

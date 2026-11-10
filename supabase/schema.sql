@@ -64,6 +64,9 @@ create table if not exists public.invoices (
   -- Added 2026-11-10 (see migrations/20261110180000_add_brand_and_client_company.sql)
   brand              text                     not null default 'seniors'::text,
   client_company     text,
+  -- Added 2026-11-10 (see migrations/20261110190000_add_invoice_language.sql)
+  language           text                     not null default 'en'::text,
+  constraint invoices_language_check check (language in ('en', 'fr')),
   constraint invoices_brand_check check (brand in ('seniors', 'business')),
   constraint invoices_pkey primary key (id),
   constraint invoices_invoice_number_key unique (invoice_number)
@@ -173,7 +176,8 @@ with (security_invoker = on) as
     notes,
     status,
     brand,
-    client_company
+    client_company,
+    language
    from invoices;
 
 revoke all on table public.invoice_public_v from anon, authenticated, public;

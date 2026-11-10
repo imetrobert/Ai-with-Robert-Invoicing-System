@@ -19,6 +19,7 @@ export const BRANDS = {
     label: 'Seniors',
     name: 'AI with Robert',
     tagline: 'AI & Technology Training for Seniors',
+    taglineFr: 'Formation en IA et en technologie pour aînés',
     website: 'seniors.aiwithrobert.com',
     logo: `${BASE}logos/seniors.png`,
     numberPrefix: 'AWR-',            // AWR-YYYYMM-001
@@ -32,6 +33,7 @@ export const BRANDS = {
     label: 'Business',
     name: 'AI with Robert',
     tagline: 'AI Consulting & Automation for Small Business',
+    taglineFr: 'Conseil et automatisation en IA pour petites entreprises',
     website: 'biz.aiwithrobert.com',
     logo: `${BASE}logos/business.png`,
     numberPrefix: 'AWR-B-',          // AWR-B-YYYYMM-001

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 import { brandOf, brandCssVars, CONTACT } from '../lib/brands'
+import { t, langOf, fmtPct } from '../lib/i18n'
 
 export default function InvoicePublic() {
   const { token } = useParams()
@@ -54,7 +55,7 @@ export default function InvoicePublic() {
       if (rpcError) console.error('PDF RPC error:', rpcError)
       await generateInvoicePDF(invoice)
     }
-    catch (e) { alert('PDF generation failed: ' + e.message) }
+    catch (e) { alert(t(langOf(invoice), 'pdfFailed') + e.message) }
     setPdfLoading(false)
   }
 
@@ -68,15 +69,19 @@ export default function InvoicePublic() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
       <div style={{ textAlign: 'center', maxWidth: 360 }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>📄</div>
-        <h2 style={{ fontFamily: "'Playfair Display', serif", color: 'var(--navy)', marginBottom: 8 }}>Invoice Not Found</h2>
-        <p style={{ color: 'var(--muted)', fontSize: 14 }}>This invoice link may have expired or is no longer available. Please contact AI with Robert directly.</p>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", color: 'var(--navy)', marginBottom: 8 }}>{t('en', 'notFoundTitle')} / {t('fr', 'notFoundTitle')}</h2>
+        <p style={{ color: 'var(--muted)', fontSize: 14 }}>{t('en', 'notFoundBody')}</p>
+        <p style={{ color: 'var(--muted)', fontSize: 14 }}>{t('fr', 'notFoundBody')}</p>
         <a href="mailto:invoices@aiwithrobert.com" style={{ display: 'inline-block', marginTop: 20, color: '#1F77AE', fontSize: 14 }}>invoices@aiwithrobert.com</a>
       </div>
     </div>
   )
 
   const services = Array.isArray(invoice.services) ? invoice.services : []
-  const taxLabel = getProvinceTaxLabel(invoice.province)
+  const lang = langOf(invoice)
+  const L = (k, v) => t(lang, k, v)
+  const money = v => formatCAD(v, lang)
+  const taxLabel = getProvinceTaxLabel(invoice.province, lang)
   const taxRate = getProvinceTaxRate(invoice.province)
   const brand = brandOf(invoice)
 
@@ -88,12 +93,12 @@ export default function InvoicePublic() {
           <img src={brand.logo} alt={brand.name} style={{ height: 32, width: 32, background: 'white', borderRadius: 6, padding: 2, objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
           <div style={{ color: 'white' }}>
             <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600 }}>{brand.name}</div>
-            <div style={{ fontSize: 10, opacity: .7 }}>{brand.tagline}</div>
+            <div style={{ fontSize: 10, opacity: .7 }}>{lang === 'fr' ? brand.taglineFr : brand.tagline}</div>
           </div>
         </div>
         <button className="btn btn-primary btn-sm" onClick={handlePDF} disabled={pdfLoading} style={{ flexShrink: 0 }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          {pdfLoading ? 'Generating…' : 'Download PDF'}
+          {pdfLoading ? L('generating') : L('downloadPdf')}
         </button>
       </div>
 
@@ -110,7 +115,7 @@ export default function InvoicePublic() {
               </div>
             </div>
             <div style={{ textAlign: 'right', color: 'white' }}>
-              <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 1 }}>INVOICE</div>
+              <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 1 }}>{L('invoice')}</div>
               <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: .8 }}>{invoice.invoice_number}</div>
             </div>
           </div>
@@ -119,9 +124,9 @@ export default function InvoicePublic() {
             {/* Bill To + Meta */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 20 }}>
               <div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--blue)', fontWeight: 700, marginBottom: 6 }}>Bill To</div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--blue)', fontWeight: 700, marginBottom: 6 }}>{L('billTo')}</div>
                 <div style={{ fontSize: 17, fontWeight: 700 }}>{invoice.client_company || invoice.client_name}</div>
-                {invoice.client_company && invoice.client_name && <div style={{ color: 'var(--muted)', fontSize: 13 }}>Attn: {invoice.client_name}</div>}
+                {invoice.client_company && invoice.client_name && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{L('attn')} {invoice.client_name}</div>}
                 {invoice.client_email && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{invoice.client_email}</div>}
                 {invoice.address_line1 && <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 3 }}>{invoice.address_line1}</div>}
                 {invoice.address_line2 && <div style={{ color: 'var(--muted)', fontSize: 13 }}>{invoice.address_line2}</div>}
@@ -132,9 +137,9 @@ export default function InvoicePublic() {
                 )}
               </div>
               <div>
-                <MetaRow label="Date of Service" value={formatDate(invoice.service_date)} />
-                <MetaRow label="Date Issued" value={formatDate(utcToETDateStr(invoice.created_at))} />
-                <MetaRow label="Status" value={(invoice.status || 'draft').toUpperCase()} />
+                <MetaRow label={L('dateOfService')} value={formatDate(invoice.service_date, lang)} />
+                <MetaRow label={L('dateIssued')} value={formatDate(utcToETDateStr(invoice.created_at), lang)} />
+                <MetaRow label={L('status')} value={L(`status_${invoice.status || 'draft'}`)} />
               </div>
             </div>
 
@@ -143,17 +148,17 @@ export default function InvoicePublic() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Service</th>
-                    <th>Description</th>
-                    <th style={{ textAlign: 'center' }}>Qty</th>
-                    <th style={{ textAlign: 'right' }}>Rate</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
+                    <th>{L('service')}</th>
+                    <th>{L('description')}</th>
+                    <th style={{ textAlign: 'center' }}>{L('qty')}</th>
+                    <th style={{ textAlign: 'right' }}>{L('rate')}</th>
+                    <th style={{ textAlign: 'right' }}>{L('amount')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {services.map((svc, i) => {
                     const isWorkshop = svc.service_id === 'group-workshop'
-                    const qtyLabel = isWorkshop ? `${svc.people || 1}p × ${svc.quantity || 1}s` : String(svc.quantity || 1)
+                    const qtyLabel = isWorkshop ? L('workshopQtyShort', { p: svc.people || 1, s: svc.quantity || 1 }) : String(svc.quantity || 1)
                     const amount = isWorkshop
                       ? (svc.people || 1) * (svc.quantity || 1) * (svc.rate || 0)
                       : (svc.quantity || 1) * (svc.rate || 0)
@@ -162,8 +167,8 @@ export default function InvoicePublic() {
                         <td style={{ fontWeight: 600 }}>{svc.service_name}</td>
                         <td style={{ color: 'var(--muted)', fontSize: 12 }}>{svc.description}</td>
                         <td style={{ textAlign: 'center' }}>{qtyLabel}</td>
-                        <td style={{ textAlign: 'right' }}>{formatCAD(svc.rate)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCAD(amount)}</td>
+                        <td style={{ textAlign: 'right' }}>{money(svc.rate)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{money(amount)}</td>
                       </tr>
                     )
                   })}
@@ -173,26 +178,26 @@ export default function InvoicePublic() {
 
             {/* Totals */}
             <div style={{ maxWidth: 280, marginLeft: 'auto', marginTop: 8 }}>
-              <div className="totals-row"><span>Subtotal</span><span>{formatCAD(invoice.subtotal || 0)}</span></div>
+              <div className="totals-row"><span>{L('subtotal')}</span><span>{money(invoice.subtotal || 0)}</span></div>
               {invoice.discount_amount > 0 && (
                 <div className="totals-row" style={{ color: 'var(--success)' }}>
-                  <span>Discount {invoice.discount_type === 'percent' ? `(${invoice.discount_value}%)` : ''}</span>
-                  <span>-{formatCAD(invoice.discount_amount)}</span>
+                  <span>{L('discount')} {invoice.discount_type === 'percent' ? `(${fmtPct(invoice.discount_value, lang)})` : ''}</span>
+                  <span>-{money(invoice.discount_amount)}</span>
                 </div>
               )}
               {invoice.gst_enabled && (
-                <div className="totals-row"><span>{taxLabel} ({taxRate}%)</span><span>{formatCAD(invoice.gst_amount || 0)}</span></div>
+                <div className="totals-row"><span>{taxLabel} ({fmtPct(taxRate, lang)})</span><span>{money(invoice.gst_amount || 0)}</span></div>
               )}
               <div className="totals-row total">
-                <span>Total Due (CAD)</span>
-                <span>{formatCAD(invoice.total || 0)}</span>
+                <span>{L('totalDueCad')}</span>
+                <span>{money(invoice.total || 0)}</span>
               </div>
             </div>
 
             {/* Notes */}
             {invoice.notes && (
               <div style={{ marginTop: 20, padding: '12px 14px', background: 'var(--bg)', borderLeft: '3px solid var(--blue)', borderRadius: 4 }}>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--blue)', fontWeight: 700, marginBottom: 5 }}>Notes</div>
+                <div style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--blue)', fontWeight: 700, marginBottom: 5 }}>{L('notes')}</div>
                 <p style={{ fontSize: 13, color: 'var(--muted)', margin: 0 }}>{invoice.notes}</p>
               </div>
             )}
@@ -200,13 +205,13 @@ export default function InvoicePublic() {
 
           {/* Footer */}
           <div style={{ background: 'var(--navy)', color: 'rgba(255,255,255,.6)', textAlign: 'center', padding: '12px 20px', fontSize: 11 }}>
-            Thank you for choosing AI with Robert! —{' '}
-            {invoice.gst_enabled ? `${taxLabel} at ${taxRate}%` : 'GST/QST/HST not applicable at this time.'}
+            {L('thanks')} —{' '}
+            {invoice.gst_enabled ? L('taxAt', { label: taxLabel, rate: fmtPct(taxRate, lang) }) : L('taxNA')}
           </div>
         </div>
 
         <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--muted)', fontSize: 13 }}>
-          Questions? Contact us at <a href={`mailto:${CONTACT.email}`} style={{ color: "var(--blue)" }}>{CONTACT.email}</a>
+          {L('questions')} <a href={`mailto:${CONTACT.email}`} style={{ color: "var(--blue)" }}>{CONTACT.email}</a>
         </div>
       </div>
     </div>
