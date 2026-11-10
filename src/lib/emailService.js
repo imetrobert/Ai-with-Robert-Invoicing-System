@@ -1,5 +1,6 @@
 import emailjs from '@emailjs/browser'
 import { brandOf, CONTACT } from './brands'
+import { t, langOf, fmtPct } from './i18n'
 import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from './invoiceUtils'
 
 const SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID
@@ -9,7 +10,10 @@ const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
 export async function sendInvoiceEmail(invoice) {
   const isPaid   = invoice.status === 'paid'
   const services = Array.isArray(invoice.services) ? invoice.services : []
-  const taxLabel = getProvinceTaxLabel(invoice.province)
+  const lang     = langOf(invoice)
+  const L        = (k, v) => t(lang, k, v)
+  const money    = v => formatCAD(v, lang)
+  const taxLabel = getProvinceTaxLabel(invoice.province, lang)
   const taxRate  = getProvinceTaxRate(invoice.province)
 
   // Use pre-calculated totals stored on the invoice record
@@ -22,22 +26,22 @@ export async function sendInvoiceEmail(invoice) {
   const attn = invoice.client_company ? `${invoice.client_name} (${invoice.client_company})` : invoice.client_name
   const publicUrl = `https://invoices.aiwithrobert.com/#/invoice/public/${invoice.view_token}`
 
-  const greeting = `Dear <strong>${attn}</strong>,<br><br>
-Thank you for placing your trust with the ${brand.name} team.<br>
-Please find below your invoice for <strong>${formatDate(invoice.service_date)}</strong>.`
+  const greeting = `${L('dear')} <strong>${attn}</strong>,<br><br>
+${L('trust', { brand: brand.name })}<br>
+${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
 
   const statusBanner = isPaid
     ? `<div style="margin:24px 0;padding:18px 24px;background:#dcfce7;border:2px solid #16a34a;border-radius:10px;text-align:center;">
-        <span style="font-size:22px;font-weight:800;color:#16a34a;letter-spacing:1px;">✅ PAYMENT RECEIVED</span>
+        <span style="font-size:22px;font-weight:800;color:#16a34a;letter-spacing:1px;">✅ ${L('paymentReceived')}</span>
        </div>`
     : `<div style="margin:24px 0;padding:18px 24px;background:#fef9c3;border:2px solid #ca8a04;border-radius:10px;text-align:center;">
-        <span style="font-size:22px;font-weight:800;color:#ca8a04;letter-spacing:1px;">⏳ AMOUNT PENDING: ${formatCAD(total)}</span>
+        <span style="font-size:22px;font-weight:800;color:#ca8a04;letter-spacing:1px;">⏳ ${L('amountPending')} ${money(total)}</span>
        </div>`
 
   const itemRows = services.map(svc => {
     const isWorkshop = svc.service_id === 'group-workshop'
     const qty = isWorkshop
-      ? `${svc.people || 1} ppl × ${svc.quantity || 1} session(s)`
+      ? L('workshopQty', { p: svc.people || 1, s: svc.quantity || 1 })
       : String(svc.quantity || 1)
     const amount = isWorkshop
       ? (svc.people || 1) * (svc.quantity || 1) * (svc.rate || 0)
@@ -47,23 +51,23 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
       <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;">${svc.service_name || ''}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#64748b;">${svc.description || ''}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:center;">${qty}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${formatCAD(svc.rate || 0)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${formatCAD(amount)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;">${money(svc.rate || 0)}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:700;">${money(amount)}</td>
     </tr>`
   }).join('')
 
   const discountRow = discountAmount > 0 ? `
     <tr>
       <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">
-        Discount${invoice.discount_type === 'percent' ? ` (${invoice.discount_value}%)` : ''}
+        ${L('discount')}${invoice.discount_type === 'percent' ? ` (${fmtPct(invoice.discount_value, lang)})` : ''}
       </td>
-      <td style="padding:8px 12px;text-align:right;color:#dc2626;">-${formatCAD(discountAmount)}</td>
+      <td style="padding:8px 12px;text-align:right;color:#dc2626;">-${money(discountAmount)}</td>
     </tr>` : ''
 
   const taxRow = invoice.gst_enabled ? `
     <tr>
-      <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">${taxLabel} (${taxRate}%)</td>
-      <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(gstAmount)}</td>
+      <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">${taxLabel} (${fmtPct(taxRate, lang)})</td>
+      <td style="padding:8px 12px;text-align:right;font-size:13px;">${money(gstAmount)}</td>
     </tr>` : ''
 
   const html_body = `
@@ -96,16 +100,16 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
           <td style="padding:0 36px 20px;">
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
-                <td style="font-size:13px;color:#64748b;">Invoice #</td>
+                <td style="font-size:13px;color:#64748b;">${L('invoiceNo')}</td>
                 <td style="font-size:13px;color:#1e293b;font-weight:600;text-align:right;">${invoice.invoice_number}</td>
               </tr>
               <tr>
-                <td style="font-size:13px;color:#64748b;padding-top:4px;">Date Issued</td>
-                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.created_at))}</td>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">${L('dateIssued')}</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(utcToETDateStr(invoice.created_at), lang)}</td>
               </tr>
               <tr>
-                <td style="font-size:13px;color:#64748b;padding-top:4px;">Date of Service</td>
-                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(invoice.service_date)}</td>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">${L('dateOfService')}</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(invoice.service_date, lang)}</td>
               </tr>
             </table>
           </td>
@@ -117,11 +121,11 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;">
               <thead>
                 <tr style="background:#f8fafc;">
-                  <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Service</th>
-                  <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Description</th>
-                  <th style="padding:10px 12px;text-align:center;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Qty</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Rate</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">Amount</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">${L('service')}</th>
+                  <th style="padding:10px 12px;text-align:left;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">${L('description')}</th>
+                  <th style="padding:10px 12px;text-align:center;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">${L('qty')}</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">${L('rate')}</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;">${L('amount')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,14 +133,14 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
               </tbody>
               <tfoot>
                 <tr>
-                  <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">Subtotal</td>
-                  <td style="padding:8px 12px;text-align:right;font-size:13px;">${formatCAD(subtotal)}</td>
+                  <td colspan="4" style="padding:8px 12px;text-align:right;color:#64748b;font-size:13px;">${L('subtotal')}</td>
+                  <td style="padding:8px 12px;text-align:right;font-size:13px;">${money(subtotal)}</td>
                 </tr>
                 ${discountRow}
                 ${taxRow}
                 <tr style="background:#f8fafc;">
-                  <td colspan="4" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1e293b;">Total Due (CAD)</td>
-                  <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:${brand.accentText};">${formatCAD(total)}</td>
+                  <td colspan="4" style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:#1e293b;">${L('totalDueCad')}</td>
+                  <td style="padding:12px;text-align:right;font-weight:700;font-size:15px;color:${brand.accentText};">${money(total)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -148,7 +152,7 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
         <tr>
           <td style="padding:0 36px 24px;">
             <div style="background:#f8fafc;border-left:3px solid ${brand.accent};border-radius:4px;padding:12px 16px;">
-              <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:4px;">Notes</div>
+              <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;margin-bottom:4px;">${L('notes')}</div>
               <div style="font-size:13px;color:#1e293b;">${invoice.notes}</div>
             </div>
           </td>
@@ -158,7 +162,7 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
         <tr>
           <td style="padding:0 36px 32px;text-align:center;">
             <p style="margin:0 0 16px;font-size:14px;color:#64748b;">
-              You can also <a href="${publicUrl}" style="color:${brand.accentText};font-weight:600;text-decoration:underline;">view and download a PDF copy of your invoice</a>.
+              ${L('emailLinkPre')} <a href="${publicUrl}" style="color:${brand.accentText};font-weight:600;text-decoration:underline;">${L('emailLinkText')}</a>.
             </p>
           </td>
         </tr>
@@ -167,7 +171,7 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
         <tr>
           <td style="background:#1e293b;padding:24px 36px;text-align:center;">
             <div style="font-size:13px;color:#94a3b8;">${brand.name} · Côte Saint-Luc, QC · ${CONTACT.email}</div>
-            <div style="font-size:12px;color:#64748b;margin-top:6px;">© ${new Date().getFullYear()} ${brand.name}. All rights reserved.</div>
+            <div style="font-size:12px;color:#64748b;margin-top:6px;">© ${new Date().getFullYear()} ${brand.name}. ${L('rights')}</div>
           </td>
         </tr>
 
@@ -181,7 +185,8 @@ Please find below your invoice for <strong>${formatDate(invoice.service_date)}</
     to_email:       invoice.client_email,
     to_name:        invoice.client_name,
     invoice_number: invoice.invoice_number,
-    total:          formatCAD(total),
+    total:          money(total),
+    subject:        L('emailSubject', { num: invoice.invoice_number }),
     html_body,
   }
 

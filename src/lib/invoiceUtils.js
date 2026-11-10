@@ -38,10 +38,10 @@ export function utcToETDateStr(isoString) {
  * Format a plain YYYY-MM-DD date string for display (no timezone shift).
  * Uses noon to avoid any UTC-boundary edge cases.
  */
-export function formatDate(dateStr) {
+export function formatDate(dateStr, lang = 'en') {
   if (!dateStr) return ''
   const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString(ET_LOCALE, { year: 'numeric', month: 'long', day: 'numeric' })
+  return d.toLocaleDateString(lang === 'fr' ? 'fr-CA' : ET_LOCALE, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 export function formatDateShort(dateStr) {
@@ -87,19 +87,20 @@ export function getProvinceTaxRate(province) {
   return 5
 }
 
-export function getProvinceTaxLabel(province) {
+export function getProvinceTaxLabel(province, lang = 'en') {
+  const fr = lang === 'fr'
   const p = (province || '').toUpperCase()
-  if (['ON', 'NB', 'NS', 'NL', 'PE'].includes(p)) return 'HST'
-  if (p === 'QC') return 'GST + QST'
-  return 'GST'
+  if (['ON', 'NB', 'NS', 'NL', 'PE'].includes(p)) return fr ? 'TVH' : 'HST'
+  if (p === 'QC') return fr ? 'TPS + TVQ' : 'GST + QST'
+  return fr ? 'TPS' : 'GST'
 }
 
 export function round2(n) {
   return Math.round(n * 100) / 100
 }
 
-export function formatCAD(amount) {
-  return new Intl.NumberFormat('en-CA', {
+export function formatCAD(amount, lang = 'en') {
+  return new Intl.NumberFormat(lang === 'fr' ? 'fr-CA' : 'en-CA', {
     style: 'currency',
     currency: 'CAD',
     minimumFractionDigits: 2,

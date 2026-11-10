@@ -84,7 +84,7 @@ function escapeCSV(val) {
 
 function exportToCSV(invoices) {
   const headers = [
-    'Invoice #', 'Brand', 'Status', 'Company Name', 'Client Name', 'Client Email',
+    'Invoice #', 'Brand', 'Language', 'Status', 'Company Name', 'Client Name', 'Client Email',
     'Service Date', 'Created Date (ET)',
     'Province',
     'Address Line 1', 'Address Line 2', 'City', 'Postal Code',
@@ -97,6 +97,7 @@ function exportToCSV(invoices) {
   const rows = invoices.map(inv => [
     inv.invoice_number,
     brandOf(inv).label,
+    inv.language === 'fr' ? 'Français' : 'English',
     inv.status || 'draft',
     inv.client_company || '',
     inv.client_name,
@@ -170,7 +171,7 @@ export default function Dashboard() {
     const { data, error } = await supabase
       .from('invoices')
       .select(`
-        id, invoice_number, brand, client_company, client_name, client_email, service_date, created_at,
+        id, invoice_number, brand, language, client_company, client_name, client_email, service_date, created_at,
         total, subtotal, discount_type, discount_value, discount_amount,
         gst_enabled, gst_amount,
         province, address_line1, address_line2, address_city, address_postal,
@@ -623,6 +624,7 @@ export default function Dashboard() {
                       <div className="invoice-client">{inv.client_company || inv.client_name}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                         <span className="invoice-number">{inv.invoice_number}</span>
+                        {inv.language === 'fr' && <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 999, background: '#e2e8f0', color: '#334155' }}>FR</span>}
                         {brandView === 'all' && <BrandBadge brand={inv} />}
                         <span className="invoice-date">{formatDateShort(inv.service_date)}</span>
                       </div>

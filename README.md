@@ -181,4 +181,5 @@ Invoices belong to a brand (`invoices.brand` = `seniors` | `business`). Brand co
 - Business invoices use open-ended lines (service, description, qty x rate) and an optional **Company name (Bill To)** (`invoices.client_company`). Same invoice-level discounts and taxes as Seniors.
 - Dashboard has an **All / Seniors / Business** toggle; each view has its own totals, and All adds a per-business breakdown. New Invoice opens on the brand being viewed (`/invoice/new?brand=business`).
 - To offer quick-pick Business services later, add entries to `BUSINESS_SERVICES` in `src/lib/services.js`.
+- **Language:** each invoice is English or Français (PDF, email, client link, dates and amounts; Quebec French). Run `supabase/migrations/20261110190000_add_invoice_language.sql` too.
 - **Database:** run `supabase/migrations/20261110180000_add_brand_and_client_company.sql` in the Supabase SQL editor BEFORE deploying this version. Existing invoices default to `seniors`.

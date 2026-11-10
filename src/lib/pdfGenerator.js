@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatCAD, formatDate, utcToETDateStr, getProvinceTaxLabel, getProvinceTaxRate } from './invoiceUtils'
+import { t, langOf, fmtPct, pdfSafe } from './i18n'
 import { brandOf, hexToRgb, CONTACT } from './brands'
 
 // Neutral colours shared by both brands.
@@ -15,6 +16,9 @@ const BASE = {
 // `BRAND` is reassigned at the start of each generateInvoicePDF() call so the
 // drawing helpers below can keep reading BRAND.* unchanged.
 let BRAND = buildPalette('seniors')
+let LANG = 'en'
+const L = (key, vars) => t(LANG, key, vars)
+const money = v => pdfSafe(formatCAD(v, LANG))
 function buildPalette(brandId) {
   const b = brandOf(brandId)
   return {
@@ -78,13 +82,13 @@ function drawHeader(doc, pageW, margin, logoData, brand) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(200, 220, 255)
-  doc.text(brand.tagline, margin + 32, 27)
+  doc.text(LANG === 'fr' ? brand.taglineFr : brand.tagline, margin + 32, 27)
   doc.text(CONTACT.address, margin + 32, 33)
   doc.text(`${CONTACT.email}  ·  ${CONTACT.phone}  ·  ${brand.website}`, margin + 32, 39)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(26)
   doc.setTextColor(...BRAND.white)
-  doc.text('INVOICE', pageW - margin, 28, { align: 'right' })
+  doc.text(L('invoice'), pageW - margin, 28, { align: 'right' })
 }
 
 function drawBody(doc, invoice, margin, pageW) {
@@ -102,16 +106,17 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   const col1 = pageW - margin - 80
   const col2 = col1 + 36
 
-  const issuedDateET = formatDate(
+  const issuedDateET = pdfSafe(formatDate(
     utcToETDateStr(invoice.created_at) ||
-    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
-  )
+    new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }),
+    LANG
+  ))
 
   const metaRows = [
-    ['Invoice #',       invoice.invoice_number],
-    ['Date Issued',     issuedDateET],
-    ['Date of Service', formatDate(invoice.service_date)],
-    ['Status',          invoice.status?.toUpperCase() || 'DRAFT'],
+    [L('invoiceNo'),     invoice.invoice_number],
+    [L('dateIssued'),    issuedDateET],
+    [L('dateOfService'), pdfSafe(formatDate(invoice.service_date, LANG))],
+    [L('status'),        L(`status_${invoice.status || 'draft'}`)],
   ]
   metaRows.forEach(([label, value], i) => {
     const y = startY + i * 7
@@ -128,7 +133,7 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.setTextColor(...BRAND.blue)
-  doc.text('BILL TO', margin, billY)
+  doc.text(L('billTo'), margin, billY)
   doc.setDrawColor(...BRAND.blue)
   doc.setLineWidth(0.4)
   doc.line(margin, billY + 1.5, margin + 40, billY + 1.5)
@@ -146,7 +151,7 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
   doc.setFontSize(9)
   doc.setTextColor(...BRAND.gray)
   let addressY = billY + 9 + (nameLines.length * 6)
-  if (company && invoice.client_name) { doc.text(`Attn: ${invoice.client_name}`, margin, addressY); addressY += 6 }
+  if (company && invoice.client_name) { doc.text(`${L('attn')} ${invoice.client_name}`, margin, addressY); addressY += 6 }
 
   if (invoice.client_email)  { doc.text(invoice.client_email,  margin, addressY); addressY += 6 }
   if (invoice.address_line1) { doc.text(invoice.address_line1, margin, addressY); addressY += 6 }
@@ -162,16 +167,16 @@ function _drawServicesTable(doc, invoice, margin, startY = 96) {
   autoTable(doc, {
     startY,
     margin: { left: margin, right: margin },
-    head: [['Service', 'Description', 'Qty / People', 'Rate', 'Amount']],
+    head: [[L('service'), L('description'), L('qtyPeople'), L('rate'), L('amount')]],
     body: services.map(item => {
       const isWorkshop = item.service_id === 'group-workshop'
       const qtyLabel   = isWorkshop
-        ? `${item.people || 1} ppl x ${item.quantity || 1} session(s)`
+        ? L('workshopQty', { p: item.people || 1, s: item.quantity || 1 })
         : String(item.quantity || 1)
       const amount = isWorkshop
         ? (item.people || 1) * (item.quantity || 1) * (item.rate || 0)
         : (item.quantity || 1) * (item.rate || 0)
-      return [item.service_name || '', item.description || '', qtyLabel, formatCAD(item.rate || 0), formatCAD(amount)]
+      return [item.service_name || '', item.description || '', qtyLabel, money(item.rate || 0), money(amount)]
     }),
     headStyles:         { fillColor: BRAND.accent, textColor: BRAND.navy, fontStyle: 'bold', fontSize: 8.5, cellPadding: 4 },
     bodyStyles:         { fontSize: 8.5, textColor: BRAND.dark, cellPadding: 3.5 },
@@ -205,21 +210,21 @@ function _drawTotals(doc, invoice, margin, pageW) {
     doc.setFontSize(9)
     doc.setTextColor(...(color || BRAND.gray))
     doc.text(label, lc, ty)
-    doc.text(formatCAD(value), rc, ty, { align: 'right' })
+    doc.text(money(value), rc, ty, { align: 'right' })
     ty += 7
   }
 
-  addRow('Subtotal', invoice.subtotal || 0)
+  addRow(L('subtotal'), invoice.subtotal || 0)
   if (invoice.discount_amount > 0) {
     const label = invoice.discount_type === 'percent'
-      ? `Discount (${invoice.discount_value}%)`
-      : 'Discount'
+      ? `${L('discount')} (${pdfSafe(fmtPct(invoice.discount_value, LANG))})`
+      : L('discount')
     addRow(label, -Math.abs(invoice.discount_amount || 0), [22, 163, 74])
   }
   if (invoice.gst_enabled) {
-    const taxLabel = getProvinceTaxLabel(invoice.province)
+    const taxLabel = getProvinceTaxLabel(invoice.province, LANG)
     const taxRate  = getProvinceTaxRate(invoice.province)
-    addRow(`${taxLabel} (${taxRate}%)`, invoice.gst_amount || 0)
+    addRow(`${taxLabel} (${pdfSafe(fmtPct(taxRate, LANG))})`, invoice.gst_amount || 0)
   }
 
   doc.setDrawColor(...BRAND.lightBlue)
@@ -230,8 +235,8 @@ function _drawTotals(doc, invoice, margin, pageW) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(...BRAND.navy)
-  doc.text('TOTAL DUE', lc, ty + 6.5)
-  doc.text(formatCAD(invoice.total || 0), rc, ty + 6.5, { align: 'right' })
+  doc.text(L('totalDue'), lc, ty + 6.5)
+  doc.text(money(invoice.total || 0), rc, ty + 6.5, { align: 'right' })
 }
 
 function _drawNotes(doc, invoice, margin, pageW) {
@@ -241,7 +246,7 @@ function _drawNotes(doc, invoice, margin, pageW) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.setTextColor(...BRAND.blue)
-  doc.text('NOTES', margin, totalsY)
+  doc.text(L('notes'), margin, totalsY)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.5)
   doc.setTextColor(...BRAND.gray)
@@ -251,7 +256,7 @@ function _drawNotes(doc, invoice, margin, pageW) {
 
 function _drawFooter(doc, invoice, pageH, margin, pageW) {
   const footY    = pageH - 20
-  const taxLabel = getProvinceTaxLabel(invoice.province)
+  const taxLabel = getProvinceTaxLabel(invoice.province, LANG)
   const taxRate  = getProvinceTaxRate(invoice.province)
 
   doc.setFillColor(...BRAND.accent)
@@ -260,14 +265,14 @@ function _drawFooter(doc, invoice, pageH, margin, pageW) {
   doc.setFontSize(7.5)
   doc.setTextColor(...BRAND.navy)
   const brand = brandOf(invoice)
-  doc.text('Thank you for choosing AI with Robert!', pageW / 2, footY + 5,  { align: 'center' })
+  doc.text(L('thanks'), pageW / 2, footY + 5,  { align: 'center' })
   doc.text(CONTACT.address, pageW / 2, footY + 10, { align: 'center' })
   doc.text(`${brand.website}  ·  ${CONTACT.email}  ·  ${CONTACT.phone}`, pageW / 2, footY + 15, { align: 'center' })
   doc.setTextColor(...BRAND.navy)
   doc.setFontSize(6.5)
   const taxNote = invoice.gst_enabled
-    ? `${taxLabel} applied at ${taxRate}%`
-    : 'GST/QST/HST not applicable at this time.'
+    ? pdfSafe(L('taxApplied', { label: taxLabel, rate: fmtPct(taxRate, LANG) }))
+    : L('taxNA')
   doc.text(taxNote, margin, footY + 10)
 }
 
@@ -279,9 +284,10 @@ export async function generateInvoicePDF(invoice) {
   const margin   = 20
   const brand    = brandOf(invoice)
   BRAND = buildPalette(brand.id)
+  LANG = langOf(invoice)
   const logoData = await fetchLogoFull(brand)
   drawHeader(doc, pageW, margin, logoData, brand)
   drawBody(doc, invoice, margin, pageW)
-  const filename = `Invoice-${invoice.invoice_number}-${invoice.client_name?.replace(/\s+/g, '-')}.pdf`
+  const filename = `${L('pdfPrefix')}-${invoice.invoice_number}-${invoice.client_name?.replace(/\s+/g, '-')}.pdf`
   doc.save(filename)
 }
