@@ -5,6 +5,7 @@ import Navbar from './Navbar'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
 import { brandOf, brandCssVars, CONTACT } from '../lib/brands'
+import { t, langOf } from '../lib/i18n'
 import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 
 export default function InvoiceView() {
@@ -142,6 +143,7 @@ export default function InvoiceView() {
               <img src={brand.logo} alt="" style={{ height: 42, width: 42, background: 'white', borderRadius: 8, padding: 3, objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
               <div style={{ color: 'white' }}>
                 <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 17, fontWeight: 700 }}>{brand.name}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: brand.accent, marginTop: 1, marginBottom: 3 }}>{t(langOf(invoice), `for_${brand.id}`)}</div>
                 <div style={{ fontSize: 11, opacity: .7 }}>{CONTACT.email} · {brand.website}</div>
               </div>
             </div>

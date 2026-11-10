@@ -110,6 +110,7 @@ export default function InvoicePublic() {
               <img src={brand.logo} alt="" style={{ height: 44, width: 44, background: 'white', borderRadius: 8, padding: 3, objectFit: 'contain' }} onError={e => e.target.style.display='none'} />
               <div style={{ color: 'white' }}>
                 <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 18, fontWeight: 700 }}>{brand.name}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: brand.accent, marginTop: 1, marginBottom: 3 }}>{L(`for_${brand.id}`)}</div>
                 <div style={{ fontSize: 11, opacity: .7 }}>{CONTACT.email} · {CONTACT.phone}</div>
                 <div style={{ fontSize: 11, opacity: .7 }}>{brand.website}</div>
               </div>

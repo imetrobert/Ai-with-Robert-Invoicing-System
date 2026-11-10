@@ -19,6 +19,8 @@ export const localeOf = x => LOCALES[langOf(x)]
 const STR = {
   en: {
     invoice: 'INVOICE',
+    for_seniors: 'for Seniors',
+    for_business: 'for Business',
     invoiceNo: 'Invoice #',
     dateIssued: 'Date Issued',
     dateOfService: 'Date of Service',
@@ -65,6 +67,8 @@ const STR = {
   },
   fr: {
     invoice: 'FACTURE',
+    for_seniors: 'pour aînés',
+    for_business: 'pour entreprises',
     invoiceNo: 'N° de facture',
     dateIssued: "Date d'émission",
     dateOfService: 'Date du service',
