@@ -150,6 +150,7 @@ export default function Dashboard() {
   const [brandView, setBrandView]     = useState(() => {
     try { const v = localStorage.getItem('dashboardBrandView'); return ['all', ...BRAND_LIST.map(b => b.id)].includes(v) ? v : 'all' } catch { return 'all' }
   })
+  const [sendLog, setSendLog]       = useState([])
   const [search, setSearch]           = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [datePreset, setDatePreset]   = useState('all')
@@ -164,7 +165,14 @@ export default function Dashboard() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     fetchInvoices()
+    fetchSendLog()
   }, [])
+
+  // Permanent send log (survives invoice deletion). Missing table => ignored.
+  async function fetchSendLog() {
+    const { data, error } = await supabase.from('email_send_log').select('sent_at')
+    if (!error) setSendLog(data || [])
+  }
 
   async function fetchInvoices() {
     setLoading(true)
@@ -271,12 +279,15 @@ export default function Dashboard() {
     // email_log holds a timestamp per actual send (initial send, resends,
     // payment confirmations, etc). Older invoices sent before email_log
     // existed fall back to their single emailed_at timestamp.
-    let count = 0
+    const inCycle = ts => new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'America/Toronto' })) >= cycleStart
+    // Permanent log is authoritative from its first row onward; the per-invoice
+    // history only fills in sends made before the permanent log existed.
+    const firstLogged = sendLog.length ? Math.min(...sendLog.map(r => new Date(r.sent_at).getTime())) : Infinity
+    let count = sendLog.filter(r => inCycle(r.sent_at)).length
     invoices.forEach(i => {
       const log = Array.isArray(i.email_log) && i.email_log.length ? i.email_log : (i.emailed_at ? [i.emailed_at] : [])
       log.forEach(ts => {
-        const sentET = new Date(new Date(ts).toLocaleString('en-US', { timeZone: 'America/Toronto' }))
-        if (sentET >= cycleStart) count++
+        if (new Date(ts).getTime() < firstLogged && inCycle(ts)) count++
       })
     })
     return count
