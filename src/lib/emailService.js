@@ -82,6 +82,7 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
         <!-- Header -->
         <tr>
           <td style="background:${brand.navy};border-bottom:4px solid ${brand.accent};padding:32px 36px;text-align:center;">
+            <img src="https://invoices.aiwithrobert.com/logos/${brand.id}.png" width="64" height="64" alt="" style="display:block;margin:0 auto 12px;width:64px;height:64px;background:#ffffff;border-radius:14px;padding:6px;">
             <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;">${brand.name}</div>
             <div style="font-size:15px;font-weight:700;color:${brand.accent};margin-top:4px;">${L('for_' + brand.id)}</div>
             <div style="font-size:13px;color:#ffffff;opacity:0.85;margin-top:4px;">${CONTACT.email}</div>
