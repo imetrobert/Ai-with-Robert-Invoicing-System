@@ -73,7 +73,7 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
   const html_body = `
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"></head>
 <body style="margin:0;padding:0;background:#f1f5f9;font-family:'Segoe UI',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
     <tr><td align="center">
@@ -81,7 +81,7 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
 
         <!-- Header -->
         <tr>
-          <td style="background:${brand.navy};border-bottom:4px solid ${brand.accent};padding:32px 36px;text-align:center;">
+          <td bgcolor="${brand.navy}" style="background-color:${brand.navy};background-image:linear-gradient(${brand.navy},${brand.navy});border-bottom:4px solid ${brand.accent};padding:32px 36px;text-align:center;">
             <img src="https://invoices.aiwithrobert.com/logos/${brand.id}.png" width="64" height="64" alt="" style="display:block;margin:0 auto 12px;width:64px;height:64px;background:#ffffff;border-radius:14px;padding:6px;">
             <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;">${brand.name}</div>
             <div style="font-size:15px;font-weight:700;color:${brand.accent};margin-top:4px;">${L('for_' + brand.id)}</div>
