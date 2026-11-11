@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { logEmailSend } from '../lib/emailLog'
 import Navbar from './Navbar'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
@@ -49,6 +50,7 @@ export default function InvoiceView() {
     setEmailLoading(true); setEmailMsg(null)
     try {
       await sendInvoiceEmail(invoice)
+      logEmailSend(invoice)
       const now = new Date().toISOString()
       // email_log records every send (not just the latest) so the EmailJS
       // quota tracker on the dashboard can count actual sends per cycle,
@@ -266,6 +268,7 @@ export default function InvoiceView() {
                 setEmailMsg(null)
                 try {
                   await sendInvoiceEmail({ ...invoice, status: 'paid' })
+                  logEmailSend(invoice)
                   const now = new Date().toISOString()
                   const emailLog = [...(invoice.email_log || []), now]
                   await supabase.from('invoices').update({ emailed_at: now, email_log: emailLog }).eq('id', id)
