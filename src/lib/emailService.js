@@ -83,7 +83,8 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
         <tr>
           <td style="background:${brand.navy};border-bottom:4px solid ${brand.accent};padding:32px 36px;text-align:center;">
             <div style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:1px;">${brand.name}</div>
-            <div style="font-size:13px;color:${brand.accent};margin-top:4px;">${CONTACT.email}</div>
+            <div style="font-size:15px;font-weight:700;color:${brand.accent};margin-top:4px;">${L('for_' + brand.id)}</div>
+            <div style="font-size:13px;color:#ffffff;opacity:0.85;margin-top:4px;">${CONTACT.email}</div>
           </td>
         </tr>
 
