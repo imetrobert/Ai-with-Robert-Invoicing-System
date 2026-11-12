@@ -38,6 +38,7 @@ re-explore the repo. For any change, open only the file(s) named below.
 | Email header banners (images, because Gmail dark mode inverts HTML) | `scripts/build_email_banners.py` (Pillow) writes `public/logos/email-<brand>-<lang>.png`; re-run if colours, logos or wording change |
 | Gemini survey extraction (2.5 Flash, one call for front+back) | `src/lib/surveyExtractor.js` |
 | Supabase client | `src/lib/supabase.js` |
+| Import a lead into a new invoice (reads the websites' `site_inquiries` and `waitlist_requests` tables from the toolkit repo's migrations; fills client, brand, language and a suggested service line) | `src/components/LeadImport.jsx` + `importLead()` in `InvoiceForm.jsx` |
 
 ## Components (line counts are large; grep the function, do not read whole files)
 

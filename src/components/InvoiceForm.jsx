@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
 import { LANGS } from '../lib/i18n'
 import { getServices } from '../lib/services'
+import LeadImport, { suggestServiceIds } from './LeadImport'
 import { BRAND_LIST, DEFAULT_BRAND, brandOf } from '../lib/brands'
 import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES } from '../lib/invoiceUtils'
 
@@ -230,6 +231,25 @@ export default function InvoiceForm() {
     setLoading(false)
   }
 
+  // Fill the client block (and a suggested service line) from a saved inquiry or waitlist sign-up.
+  function importLead(l) {
+    const target = l.site === 'seniors' ? 'seniors' : 'business'
+    if (target !== brand) changeBrand(target)
+    setClientName(l.name || '')
+    setClientCompany(target === 'business' ? (l.organization || '') : '')
+    setClientEmail(l.email || '')
+    setLanguage(l.language === 'fr' ? 'fr' : 'en')
+    const ids = suggestServiceIds(l, target)
+    const catalog = getServices(target)
+    if (ids.length && lineItems.every(x => !x.service_name)) {
+      setLineItems(ids.map(sid => {
+        const svc = catalog.find(c => c.id === sid)
+        return { ...EMPTY_LINE(target), service_id: sid, service_name: svc?.name || '', description: svc?.description || '', rate: svc?.rate || 0 }
+      }))
+    }
+    setError('')
+  }
+
   function handleClientSelect(name) {
     setClientName(name)
     const matches = allClients.filter(r => r.client_name === name)
@@ -351,6 +371,7 @@ export default function InvoiceForm() {
           <div className="card" style={{ marginBottom: 12 }}>
             <div className="card-header"><h2>Invoice Details</h2></div>
             <div className="card-body">
+              {!isEditing && <LeadImport onPick={importLead} />}
               <div className="form-group">
                 <label className="form-label">Brand</label>
                 <div style={{ display: 'flex', gap: 8 }}>
