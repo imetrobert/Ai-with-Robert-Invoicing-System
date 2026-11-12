@@ -31,7 +31,7 @@ re-explore the repo. For any change, open only the file(s) named below.
 | Brand colours, logo, tagline, number prefix | `src/lib/brands.js` (logos in `public/logos/`) |
 | Client-facing wording EN/FR, fr-CA formatting | `src/lib/i18n.js` |
 | Money, dates, GST/QST (5% / 9.975%), invoice numbering | `src/lib/invoiceUtils.js` |
-| Service catalog and rates | `src/lib/services.js` (`BUSINESS_SERVICES` is empty on purpose) |
+| Service catalog and rates | `src/lib/services.js` (`BUSINESS_SERVICES` = Business price list, keep equal to the Pricing section on biz.aiwithrobert.com and FX_PRICE in the toolkit) |
 | PDF layout | `src/lib/pdfGenerator.js` |
 | Email sending (EmailJS; template Subject is `{{subject}}`) | `src/lib/emailService.js` |
 | EmailJS quota log (200 per cycle, resets on the 10th) | `src/lib/emailLog.js` + table `email_send_log` |

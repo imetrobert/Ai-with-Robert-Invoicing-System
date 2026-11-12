@@ -57,11 +57,73 @@ export const SERVICES = [
   },
 ]
 
-// Business invoices are open-ended: each line is a service name, a description,
-// a quantity and a rate, so there is no fixed price list yet. To add a saved
-// catalog later, add entries here (same shape as SERVICES); the Business form
-// then shows a "Quick add" picker above the open-ended fields automatically.
-export const BUSINESS_SERVICES = []
+// Business quick-add catalog. Mirrors the Pricing section on biz.aiwithrobert.com
+// (and FX_PRICE in the toolkit repo): keep the three equal. Prices are CAD before
+// GST/QST. Rate x Quantity is the line total, so per-person and per-hour items use
+// Quantity. Each line stays editable (name, description, quantity, rate) after
+// picking, and "Custom" is still available for anything not listed.
+export const BUSINESS_SERVICES = [
+  {
+    id: 'biz-assessment-small',
+    name: 'AI Opportunity Assessment (up to 5 people)',
+    description: 'Your needs checked against your AI plan, written assessment, workflow shortlist and proposal',
+    rate: 900.00, unit: 'flat', unitLabel: '',
+  },
+  {
+    id: 'biz-assessment-large',
+    name: 'AI Opportunity Assessment (6 to 20 people)',
+    description: 'Your needs checked against your AI plan, written assessment, workflow shortlist and proposal',
+    rate: 1800.00, unit: 'flat', unitLabel: '',
+  },
+  {
+    id: 'biz-workflow',
+    name: 'AI Workflow Setup (per workflow)',
+    description: 'Workflow document, saved instructions set up in your AI account, tested on a real example, handover',
+    rate: 2000.00, unit: 'flat', unitLabel: '/workflow',
+  },
+  {
+    id: 'biz-condition',
+    name: 'Workflow condition (extra setup on your plan)',
+    description: 'Additional setup for a need your plan supports only partly, quoted in the proposal',
+    rate: 500.00, unit: 'flat', unitLabel: '/condition',
+  },
+  {
+    id: 'biz-training',
+    name: 'Team Training Session (up to 10 people, 3 hours)',
+    description: 'Live hands-on session, workbook and slides, take-home handout and feedback survey',
+    rate: 1500.00, unit: 'flat', unitLabel: '',
+  },
+  {
+    id: 'biz-training-extra',
+    name: 'Team Training: additional person',
+    description: 'Each person beyond the first 10 in a training session (set Quantity to the number of extra people)',
+    rate: 100.00, unit: 'person', unitLabel: '/person',
+  },
+  {
+    id: 'biz-bundle',
+    name: 'Starter Bundle',
+    description: 'Assessment (up to 5 people), one workflow set up and tested, one training session (up to 10 people)',
+    rate: 3950.00, unit: 'flat', unitLabel: '',
+  },
+  {
+    id: 'biz-talk',
+    name: 'Talk for a business group',
+    description: 'Presentation for your group or event (price is a starting price, confirmed in the proposal)',
+    rate: 500.00, unit: 'flat', unitLabel: '',
+  },
+  {
+    id: 'biz-support',
+    name: 'Monthly support (about 2 hours)',
+    description: 'Ongoing help with your AI workflows',
+    rate: 300.00, unit: 'month', unitLabel: '/month',
+  },
+  {
+    id: 'biz-hourly',
+    name: 'Extra help (hourly)',
+    description: 'Additional hands-on help outside a package',
+    rate: 150.00, unit: 'hour', unitLabel: '/hr',
+  },
+]
 
 export function getServices(brand) {
   return brand === 'business' ? BUSINESS_SERVICES : SERVICES
