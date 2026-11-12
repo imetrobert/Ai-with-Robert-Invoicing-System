@@ -15,8 +15,7 @@ re-explore the repo. For any change, open only the file(s) named below.
   the app. After adding one, also update `supabase/schema.sql` (it is a snapshot
   of the live database, kept current, not a history).
 - Never hardcode keys. Build-time env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-  `VITE_EMAILJS_*` (GitHub Actions secrets). The Gemini key lives in the
-  user's browser `localStorage`, never in the repo.
+  `VITE_EMAILJS_*` (GitHub Actions secrets). This app makes no AI API calls.
 - Both brands (Seniors, Business) are billed under the AIWithRobert master corp.
   Invoice numbers: Seniors `AWR-YYYYMM-001`, Business `AWR-B-YYYYMM-001`.
 - Client-facing documents (PDF, public page, email) support EN and Quebec FR;
@@ -36,7 +35,6 @@ re-explore the repo. For any change, open only the file(s) named below.
 | Email sending (EmailJS; template Subject is `{{subject}}`) | `src/lib/emailService.js` |
 | EmailJS quota log (200 per cycle, resets on the 10th) | `src/lib/emailLog.js` + table `email_send_log` |
 | Email header banners (images, because Gmail dark mode inverts HTML) | `scripts/build_email_banners.py` (Pillow) writes `public/logos/email-<brand>-<lang>.png`; re-run if colours, logos or wording change |
-| Gemini survey extraction (2.5 Flash, one call for front+back) | `src/lib/surveyExtractor.js` |
 | Supabase client | `src/lib/supabase.js` |
 | Import a lead into a new invoice (reads the websites' `site_inquiries` and `waitlist_requests` tables from the toolkit repo's migrations; fills client, brand, language and a suggested service line) | `src/components/LeadImport.jsx` + `importLead()` in `InvoiceForm.jsx` |
 
@@ -44,16 +42,16 @@ re-explore the repo. For any change, open only the file(s) named below.
 
 | File | Lines | What | Find with |
 |------|-------|------|-----------|
-| `src/App.jsx` | ~60 | Router + auth gate. Routes: `/login`, `/`, `/invoice/new`, `/invoice/:id`, `/invoice/:id/edit`, `/invoice/public/:token`, `/surveys`, `/surveys/upload`, `/tax-summary` | `grep -n "Route " src/App.jsx` |
+| `src/App.jsx` | ~60 | Router + auth gate. Routes: `/login`, `/`, `/invoice/new`, `/invoice/:id`, `/invoice/:id/edit`, `/invoice/public/:token`, `/tax-summary` | `grep -n "Route " src/App.jsx` |
 | `Dashboard.jsx` | ~700 | Invoice list, All/Seniors/Business toggle, filters, CSV export, EmailJS quota card | `grep -n "^function\|^  async function\|^  function" ...` |
 | `InvoiceForm.jsx` | ~690 | Create/edit: brand + language selectors, line items, discounts, autocomplete | same |
 | `InvoiceView.jsx` | ~400 | Internal single-invoice view (send, mark paid, PDF) | |
 | `InvoicePublic.jsx` | | Client link, no login (uses RPC `invoice_by_token`) | |
-| `SurveyUpload.jsx` | ~600 | Photo of a paper survey to Gemini to review form to save | stages: `upload / staged / extracting / review / saving` |
-| `SurveyDashboard.jsx` | | Results by topic | |
 | `TaxSummary.jsx` | ~415 | GST/QST report; combines both brands | `getTaxBreakdown` |
 | `Login.jsx`, `Navbar.jsx` | small | Auth screen; nav (title hidden under 480px) | |
 | `src/index.css` | | All styles (`.navbar-*` etc.) | grep the class |
+
+Surveys are NOT in this app any more: they moved to the toolkit (Surveys screen, `survey_responses` table).
 
 ## Database (see `supabase/schema.sql`)
 

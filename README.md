@@ -44,7 +44,7 @@ Two things to know about it:
   than for replay.
 - It covers **this app only**. The Supabase project is shared, so other apps'
   tables (`etf_*`, `job_*`, `profiles`) are absent, and so is `survey_responses`
-  — used by this app's survey screens, but part of separate authorization work.
+  — surveys now live in the toolkit app, not here.
   It is not a complete backup of the project.
 
 Earlier revisions of this README told you to run a `supabase-setup.sql`. That

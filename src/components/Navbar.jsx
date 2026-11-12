@@ -26,12 +26,6 @@ export default function Navbar({ session }) {
 
       <div className="navbar-actions">
         <Link
-          to="/surveys"
-          className="nav-link"
-        >
-          Surveys
-        </Link>
-        <Link
           to="/tax-summary"
           className="nav-link"
         >

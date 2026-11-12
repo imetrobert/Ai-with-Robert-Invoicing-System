@@ -18,8 +18,7 @@
 --
 -- SCOPE: this app only. The Supabase project is shared with other apps, whose
 -- tables (etf_*, job_*, profiles) are deliberately absent. `survey_responses` is
--- read by this app's survey screens but is also absent — it is part of separate
--- authorization work and was left untouched on purpose. This file is therefore
+-- also absent: surveys now live in the toolkit (imetrobert/aiwithrobert-toolkit). This file is therefore
 -- NOT a complete backup of the project.
 --
 -- Source database: PostgreSQL 17.6.
