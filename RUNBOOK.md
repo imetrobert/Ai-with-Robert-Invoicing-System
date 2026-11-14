@@ -12,9 +12,10 @@
 | Deploy failed | GitHub > Actions > Deploy to GitHub Pages > read the red step. Re-run once. |
 | Can't log in / data won't load | Supabase may be paused: open the project at supabase.com and press Restore. |
 | Emails stop sending | EmailJS quota used up or key changed. Check the quota card and the EmailJS dashboard. |
-| Survey photo extraction fails | The Gemini key stored in the browser (Surveys > Upload > key setup) expired; paste a new one. |
+| The weekly "Checks" run is red | Read its red step: a price differs from the website, or a tax/numbering rule changed. Fix it using `docs/common-edits.md`. |
 
 ## Changing things
+Step-by-step recipes for the usual edits (prices, wording, services, tax, database) are in `docs/common-edits.md`.
 - Wording on invoices: `src/lib/i18n.js` (EN and FR together).
 - Brand colours or logos: `src/lib/brands.js`, then re-run `scripts/build_email_banners.py` (needs a computer; otherwise leave email banners as they are).
 - Any change to the database: add a migration file with the Data API grants (copy `supabase/migrations/20261110210000_add_email_send_log.sql`), run it in the Supabase SQL editor BEFORE deploying, and update `supabase/schema.sql`.

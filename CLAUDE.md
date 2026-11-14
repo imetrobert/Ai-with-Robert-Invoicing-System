@@ -62,6 +62,10 @@ RLS: authenticated users only; anon reaches data only through the RPC/view.
 
 ## Cheap-edit habits
 
+Recipes for the likely edits are in `docs/common-edits.md`. Safety checks: `node scripts/check_money.mjs` (tax, discounts, invoice numbers) and
+`python3 scripts/check_prices.py` (Business rates equal biz.aiwithrobert.com); the weekly "Checks" workflow runs both.
+
+
 - Wording change on a client document: `src/lib/i18n.js` only (EN + FR together).
 - Colour/logo change: `src/lib/brands.js`, then re-run `scripts/build_email_banners.py`.
 - New field on invoices: migration (with grants) + `supabase/schema.sql` +
