@@ -1,0 +1,26 @@
+name: Checks
+
+# Weekly safety net (and on demand, and when the money or price code changes).
+# A red run = something drifted; GitHub emails you. Nothing here blocks a deploy.
+on:
+  schedule:
+    - cron: '17 12 * * 1'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/lib/**'
+      - 'scripts/check_*'
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Money rules (GST/QST/HST, discounts, invoice numbers)
+        run: node scripts/check_money.mjs
+      - name: Business prices match biz.aiwithrobert.com
+        run: python3 scripts/check_prices.py
