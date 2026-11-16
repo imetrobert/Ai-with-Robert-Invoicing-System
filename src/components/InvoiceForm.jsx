@@ -5,6 +5,7 @@ import Navbar from './Navbar'
 import { LANGS } from '../lib/i18n'
 import { getServices } from '../lib/services'
 import LeadImport, { suggestServiceIds } from './LeadImport'
+import { usualServiceLines } from '../lib/usualServices'
 import { BRAND_LIST, DEFAULT_BRAND, brandOf } from '../lib/brands'
 import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES } from '../lib/invoiceUtils'
 
@@ -172,7 +173,7 @@ export default function InvoiceForm() {
   async function fetchClients() {
     const { data } = await supabase
       .from('invoices')
-      .select('client_name, client_company, client_email, address_line1, address_line2, address_city, address_postal, province, notes, language')
+      .select('client_name, client_company, client_email, address_line1, address_line2, address_city, address_postal, province, notes, language, brand, services')
       .order('created_at', { ascending: false })
 
     if (!data) return
@@ -250,10 +251,20 @@ export default function InvoiceForm() {
     setError('')
   }
 
+  // New invoice, nothing chosen yet: start the service lines from what this client usually gets
+  // (services on every one of their recent invoices, with their usual quantity, people and rate).
+  function prefillUsualServices(clientRows) {
+    if (isEditing || lineItems.some(l => l.service_name)) return
+    const usual = usualServiceLines(clientRows, brand)
+    if (!usual.length) return
+    setLineItems(usual.map(u => ({ ...EMPTY_LINE(brand), ...u })))
+  }
+
   function handleClientSelect(name) {
     setClientName(name)
     const matches = allClients.filter(r => r.client_name === name)
     if (!matches.length) return
+    prefillUsualServices(matches)
 
     // allClients is fetched ordered by created_at descending, so matches[0]
     // is this client's most recent invoice — use it as the source of truth
@@ -274,6 +285,7 @@ export default function InvoiceForm() {
     setClientCompany(company)
     const c = allClients.find(r => r.client_company === company)
     if (!c) return
+    prefillUsualServices(allClients.filter(r => r.client_company === company))
     if (!isEditing && c.language) setLanguage(c.language === 'fr' ? 'fr' : 'en')
     if (c.client_name)    setClientName(c.client_name)
     if (c.client_email)   setClientEmail(c.client_email)
