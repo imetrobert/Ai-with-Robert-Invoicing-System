@@ -10,6 +10,16 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    # React 19 is a major upgrade that needs real testing; stay on React 18 until then.
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
