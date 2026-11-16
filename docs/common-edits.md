@@ -44,3 +44,9 @@ SQL editor BEFORE deploying, then update `supabase/schema.sql`. For a new invoic
 
 ## Monthly (5 minutes)
 See `RUNBOOK.md`: export a CSV backup, check the EmailJS quota card, confirm Keep-Alive is green.
+
+## Usual services pre-fill (new invoice)
+Picking a client (or a Business company) in the new-invoice form fills the service lines from that client's last 5 invoices of the same brand: only services that
+appear on EVERY one of them, with their most common quantity, people and rate (a tie goes to the newest). It only runs on a new invoice whose lines are still empty, so
+it never overwrites anything typed, and every line stays editable. Logic: `src/lib/usualServices.js` (tested by `scripts/check_usual_services.mjs`, run by Checks);
+wiring: `prefillUsualServices()` in `InvoiceForm.jsx`. To change how many invoices count, edit `USUAL_LOOKBACK`.

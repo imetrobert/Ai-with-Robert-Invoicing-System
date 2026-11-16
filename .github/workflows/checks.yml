@@ -22,5 +22,7 @@ jobs:
           node-version: '20'
       - name: Money rules (GST/QST/HST, discounts, invoice numbers)
         run: node scripts/check_money.mjs
+      - name: Usual-services pre-fill
+        run: node scripts/check_usual_services.mjs
       - name: Business prices match biz.aiwithrobert.com
         run: python3 scripts/check_prices.py
