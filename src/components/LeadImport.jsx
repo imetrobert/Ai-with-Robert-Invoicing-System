@@ -52,10 +52,31 @@ export default function LeadImport({ onPick }) {
       setError('Could not load leads. Run the Supabase migrations from the toolkit repo (site_inquiries.sql, site_capacity.sql) and check that your login has toolkit access.')
       return
     }
+    // The toolkit's Leads screen is the source of truth: a lead deleted there leaves its website row behind
+    // (marked contacted), and an archived lead should not be offered either. Match by the contact's email.
+    // If the toolkit's saved leads cannot be read, fall back to showing everything that is not archived.
+    let live = null
+    const t = await supabase.from('toolkit_sessions').select('id, lead:data->lead').limit(2000)
+    if (!t.error && Array.isArray(t.data)) {
+      live = { active: new Set(), archived: new Set() }
+      for (const r of t.data) {
+        if (!r.lead) continue
+        const found = String(r.lead.contact || '').toLowerCase().match(/[^\s·,;]+@[^\s·,;]+\.[^\s·,;]+/)
+        if (found) (r.lead.archived ? live.archived : live.active).add(found[0])
+      }
+    }
+    const keep = (r) => {
+      if (!live) return true
+      const e = String(r.email || '').toLowerCase()
+      if (!e) return true
+      if (live.active.has(e)) return true
+      if (live.archived.has(e)) return false
+      return r.status === 'new'   // no lead at all: only rows the toolkit has not turned into a lead yet
+    }
     const rows = [
       ...(a.data || []).map(r => ({ ...r, source: 'Inquiry' })),
       ...(b.data || []).map(r => ({ ...r, source: 'Waitlist' })),
-    ].sort((x, y) => (x.created_at < y.created_at ? 1 : -1))
+    ].filter(keep).sort((x, y) => (x.created_at < y.created_at ? 1 : -1))
     setLeads(rows)
   }
 

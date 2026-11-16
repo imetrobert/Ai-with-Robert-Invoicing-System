@@ -50,3 +50,8 @@ Picking a client (or a Business company) in the new-invoice form fills the servi
 appear on EVERY one of them, with their most common quantity, people and rate (a tie goes to the newest). It only runs on a new invoice whose lines are still empty, so
 it never overwrites anything typed, and every line stays editable. Logic: `src/lib/usualServices.js` (tested by `scripts/check_usual_services.mjs`, run by Checks);
 wiring: `prefillUsualServices()` in `InvoiceForm.jsx`. To change how many invoices count, edit `USUAL_LOOKBACK`.
+
+## "Import a lead" list (new invoice)
+`src/components/LeadImport.jsx` lists website inquiries and waitlist sign-ups, filtered against the toolkit's own leads (table `toolkit_sessions`, matched by the email in the
+lead's contact): a lead deleted or archived in the toolkit is not offered; a row the toolkit has not turned into a lead yet (status new) still is. If the toolkit table cannot
+be read, the list falls back to everything not archived.
