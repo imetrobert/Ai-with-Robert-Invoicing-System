@@ -157,6 +157,7 @@ export default function InvoiceForm() {
   const [notesSuggestions, setNotesSuggestions]   = useState([])
 
   const clientInputRef = useRef(null)
+  const leadApplied = useRef(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
@@ -178,6 +179,7 @@ export default function InvoiceForm() {
 
     if (!data) return
     setAllClients(data)
+    applyLeadParams(data)
 
     const unique = (arr) => [...new Set(arr.filter(Boolean))]
     setNameSuggestions(unique(data.map(r => r.client_name)))
@@ -233,7 +235,35 @@ export default function InvoiceForm() {
   }
 
   // Fill the client block (and a suggested service line) from a saved inquiry or waitlist sign-up.
-  function importLead(l) {
+  // Opened from the toolkit's "Create invoice" button on a Won lead: the address carries the client's details
+  // (#/invoice/new?brand=..&lead_name=..&lead_email=..&lead_org=..&lead_lang=..; the part after # never leaves the browser).
+  // A returning client also gets their saved address and usual services; a new one gets a suggestion from their website request.
+  async function applyLeadParams(rows) {
+    const name = (searchParams.get('lead_name') || '').trim(), email = (searchParams.get('lead_email') || '').trim()
+    if (isEditing || leadApplied.current || (!name && !email)) return
+    leadApplied.current = true
+    const lead = { site: brand, name, email, organization: (searchParams.get('lead_org') || '').trim(), language: searchParams.get('lead_lang') === 'fr' ? 'fr' : 'en', extra: {} }
+    const em = email.toLowerCase()
+    const matches = rows.filter(r => (em && String(r.client_email || '').toLowerCase() === em) || (!em && r.client_name === name))
+    if (matches.length) {
+      importLead(lead, true)
+      prefillUsualServices(matches)
+      const c = matches[0]
+      if (c.address_line1) setAddressLine1(c.address_line1)
+      setAddressLine2(c.address_line2 || '')
+      if (c.address_city) setAddressCity(c.address_city)
+      if (c.address_postal) setAddressPostal(c.address_postal)
+      if (c.province) setProvince(c.province)
+      return
+    }
+    if (email) {
+      const { data } = await supabase.from('site_inquiries').select('*').ilike('email', email).order('created_at', { ascending: false }).limit(1)
+      if (data && data[0]) { lead.extra = data[0].extra || {}; lead.services = data[0].services || [] }
+    }
+    importLead(lead)
+  }
+
+  function importLead(l, skipLines) {
     const target = l.site === 'seniors' ? 'seniors' : 'business'
     if (target !== brand) changeBrand(target)
     setClientName(l.name || '')
@@ -242,7 +272,7 @@ export default function InvoiceForm() {
     setLanguage(l.language === 'fr' ? 'fr' : 'en')
     const ids = suggestServiceIds(l, target)
     const catalog = getServices(target)
-    if (ids.length && lineItems.every(x => !x.service_name)) {
+    if (!skipLines && ids.length && lineItems.every(x => !x.service_name)) {
       setLineItems(ids.map(sid => {
         const svc = catalog.find(c => c.id === sid)
         return { ...EMPTY_LINE(target), service_id: sid, service_name: svc?.name || '', description: svc?.description || '', rate: svc?.rate || 0 }

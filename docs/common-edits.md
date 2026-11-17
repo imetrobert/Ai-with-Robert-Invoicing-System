@@ -55,3 +55,8 @@ wiring: `prefillUsualServices()` in `InvoiceForm.jsx`. To change how many invoic
 `src/components/LeadImport.jsx` lists website inquiries and waitlist sign-ups, filtered against the toolkit's own leads (table `toolkit_sessions`, matched by the email in the
 lead's contact): a lead deleted or archived in the toolkit is not offered; a row the toolkit has not turned into a lead yet (status new) still is. If the toolkit table cannot
 be read, the list falls back to everything not archived.
+
+### Lead to invoice handoff
+The toolkit's Won lead card has "Create invoice" (`#/invoice/new?brand=..&lead_name=..&lead_email=..&lead_org=..&lead_lang=..`). `applyLeadParams()` in `InvoiceForm.jsx` reads those (run once, after the client list loads):
+a returning client (same email) gets saved address and usual services; a new one gets the name, email, company and language, and a suggested service line from their latest `site_inquiries` row (`suggestServiceIds`).
+Change the parameter names in both repos together (toolkit `invoiceUrl()` in index.html).
