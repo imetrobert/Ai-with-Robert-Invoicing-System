@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+// "Request access" link: opens an email to Robert with the app and URL filled in.
+const APP_NAME = 'AI with Robert Invoicing'
+const APP_URL = 'https://invoices.aiwithrobert.com'
+const REQUEST_ACCESS_HREF =
+  'mailto:robert@imetrobert.com?subject=' + encodeURIComponent('Access request: ' + APP_NAME) +
+  '&body=' + encodeURIComponent('Hi Robert,\n\nI would like an account or access to ' + APP_NAME + ' (' + APP_URL + ').\n\nMy name: \nMy email address: \n\nThank you')
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -59,6 +66,11 @@ export default function Login() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
+
+        <p style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: '#64748b' }}>
+          Need an account or access? Email{' '}
+          <a href={REQUEST_ACCESS_HREF}>robert@imetrobert.com</a> and Robert will send you a link to register.
+        </p>
 
         <p style={{ textAlign: 'center', marginTop: 20, fontSize: 11, color: '#94a3b8' }}>
           🔒 Private access only — aiwithrobert.com
