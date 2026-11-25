@@ -72,6 +72,6 @@ Recipes for the likely edits are in `docs/common-edits.md`. Safety checks: `node
   `invoice_public_v` if the client page needs it + `InvoiceForm.jsx` + the three
   document renderers (PDF, `InvoicePublic.jsx`, `InvoiceView.jsx`).
 - Keep-alive: `.github/workflows/keep-alive.yml` pings Supabase daily so the free
-  tier does not pause. Leave it enabled.
+  tier does not pause. Leave it enabled. `keepalive-commit.yml` makes a tiny commit on the 1st and 15th so GitHub never pauses it (no manual commit needed).
 - `README.md` is setup documentation for a fresh install; it is not needed for
   routine changes.
