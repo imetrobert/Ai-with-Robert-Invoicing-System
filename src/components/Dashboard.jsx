@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { formatCAD, formatDateShort, STATUS_COLORS, utcToETDateStr } from '../lib/invoiceUtils'
+import { formatCAD, formatDateShort, STATUS_COLORS, utcToETDateStr, daysOverdue } from '../lib/invoiceUtils'
 import { BRANDS, BRAND_LIST, brandOf } from '../lib/brands'
 
 // Totals for a list of invoices (paid = collected, everything else = outstanding)
@@ -230,7 +230,9 @@ export default function Dashboard() {
     }
 
     if (statusFilter !== 'all') {
-      result = result.filter(inv => (inv.status || 'draft') === statusFilter)
+      result = statusFilter === 'overdue'
+        ? result.filter(inv => daysOverdue(inv) > 0)
+        : result.filter(inv => (inv.status || 'draft') === statusFilter)
     }
 
     if (clientFilter.trim()) {
@@ -267,6 +269,7 @@ export default function Dashboard() {
     clientFilter.trim() !== '',
   ].filter(Boolean).length
 
+  const overdueList = brandInvoices.filter(i => daysOverdue(i) > 0)
   const viewStats = summarize(brandInvoices)
   const totalRevenue = viewStats.collected
   const outstanding  = viewStats.outstanding
@@ -351,6 +354,12 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        )}
+
+        {overdueList.length > 0 && statusFilter !== 'overdue' && (
+          <button className="alert alert-error" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', marginBottom: 12 }} onClick={() => { setStatusFilter('overdue'); setFiltersOpen(false) }}>
+            <strong>{overdueList.length} overdue invoice{overdueList.length !== 1 ? 's' : ''}</strong> · {formatCAD(overdueList.reduce((s, i) => s + (i.total || 0), 0))} · tap to review and send reminders
+          </button>
         )}
 
         <div className="stats-grid">
@@ -462,6 +471,7 @@ export default function Dashboard() {
                     { id: 'draft', label: 'Draft' },
                     { id: 'sent',  label: 'Sent' },
                     { id: 'paid',  label: 'Paid' },
+                    { id: 'overdue', label: 'Overdue' },
                   ].map(s => (
                     <button
                       key={s.id}
@@ -476,7 +486,7 @@ export default function Dashboard() {
                       {s.id === 'all' ? 'All statuses' : s.label}
                       {s.id !== 'all' && (
                         <span style={{ color: 'var(--muted)', fontWeight: 400, marginLeft: 2, fontSize: 11 }}>
-                          ({brandInvoices.filter(i => (i.status || 'draft') === s.id).length})
+                          ({s.id === 'overdue' ? brandInvoices.filter(i => daysOverdue(i) > 0).length : brandInvoices.filter(i => (i.status || 'draft') === s.id).length})
                         </span>
                       )}
                     </button>
@@ -618,6 +628,7 @@ export default function Dashboard() {
             {filtered.map(inv => {
               const isPaid  = inv.status === 'paid'
               const isSent  = inv.status === 'sent'
+              const late    = daysOverdue(inv)
               const rowClass = isPaid ? ' invoice-row-paid' : isSent ? ' invoice-row-unpaid' : ''
 
               return (
@@ -648,6 +659,7 @@ export default function Dashboard() {
                           Paid
                         </span>
                       )}
+                      {late > 0 && <span className="badge badge-overdue" style={{ padding: '1px 8px', fontSize: 10 }}>Overdue {late}d</span>}
                       {isSent && (
                         <span className="unpaid-tag">
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>

@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable'
 import { formatCAD, formatDate, utcToETDateStr, getProvinceTaxLabel, getProvinceTaxRate } from './invoiceUtils'
 import { t, langOf, fmtPct, pdfSafe } from './i18n'
 import { brandOf, hexToRgb, CONTACT } from './brands'
+import { taxNumberText } from './taxNumbers'
 
 // Neutral colours shared by both brands.
 const BASE = {
@@ -121,6 +122,7 @@ function _drawMetaAndBillTo(doc, invoice, margin, pageW, startY = 62) {
     [L('invoiceNo'),     invoice.invoice_number],
     [L('dateIssued'),    issuedDateET],
     [L('dateOfService'), pdfSafe(formatDate(invoice.service_date, LANG))],
+    ...(invoice.due_date && invoice.status !== 'paid' ? [[L('dueDate'), pdfSafe(formatDate(invoice.due_date, LANG))]] : []),
     [L('status'),        L(`status_${invoice.status || 'draft'}`)],
   ]
   metaRows.forEach(([label, value], i) => {
@@ -270,9 +272,12 @@ function _drawFooter(doc, invoice, pageH, margin, pageW) {
   doc.setFontSize(7.5)
   doc.setTextColor(...BRAND.navy)
   const brand = brandOf(invoice)
-  doc.text(L('thanks'), pageW / 2, footY + 5,  { align: 'center' })
-  doc.text(CONTACT.address, pageW / 2, footY + 10, { align: 'center' })
-  doc.text(`${brand.website}  ·  ${CONTACT.email}  ·  ${CONTACT.phone}`, pageW / 2, footY + 15, { align: 'center' })
+  const taxNos = pdfSafe(taxNumberText(LANG))   // empty until the numbers are filled in (src/lib/taxNumbers.js)
+  const ys = taxNos ? [4, 8, 12, 16.5] : [5, 10, 15]
+  doc.text(L('thanks'), pageW / 2, footY + ys[0],  { align: 'center' })
+  doc.text(CONTACT.address, pageW / 2, footY + ys[1], { align: 'center' })
+  doc.text(`${brand.website}  ·  ${CONTACT.email}  ·  ${CONTACT.phone}`, pageW / 2, footY + ys[2], { align: 'center' })
+  if (taxNos) doc.text(taxNos, pageW / 2, footY + ys[3], { align: 'center' })
   doc.setTextColor(...BRAND.navy)
   doc.setFontSize(6.5)
   const taxNote = invoice.gst_enabled

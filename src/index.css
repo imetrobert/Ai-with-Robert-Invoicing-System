@@ -266,6 +266,7 @@ textarea.form-control { resize: vertical; min-height: 80px; font-size: 15px; }
 .badge-draft { background: #f1f5f9; color: #64748b; }
 .badge-sent  { background: var(--blue-pale); color: var(--blue); }
 .badge-paid  { background: var(--success-bg); color: var(--success); }
+.badge-overdue { background: #fee2e2; color: #b91c1c; }
 
 /* ── Invoice view ── */
 .invoice-view { max-width: 720px; }

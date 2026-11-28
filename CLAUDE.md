@@ -35,6 +35,8 @@ re-explore the repo. For any change, open only the file(s) named below.
 | Email sending (EmailJS; template Subject is `{{subject}}`) | `src/lib/emailService.js` |
 | EmailJS quota log (200 per cycle, resets on the 10th) | `src/lib/emailLog.js` + table `email_send_log` |
 | Email header banners (images, because Gmail dark mode inverts HTML) | `scripts/build_email_banners.py` (Pillow) writes `public/logos/email-<brand>-<lang>.png`; re-run if colours, logos or wording change |
+| GST/QST registration numbers (blank until Robert has them; fill in and they print everywhere) | `src/lib/taxNumbers.js` (recipe "Add the GST/QST numbers" in `docs/common-edits.md`) |
+| Due dates, overdue, reminders, accountant CSV | `invoiceUtils.js` (`daysOverdue`), `emailService.js` (`reminder`), `accountantExport.js`; recipes in `docs/common-edits.md` |
 | Supabase client | `src/lib/supabase.js` |
 | Import a lead into a new invoice (reads the websites' `site_inquiries` and `waitlist_requests` tables from the toolkit repo's migrations; fills client, brand, language and a suggested service line) | `src/components/LeadImport.jsx` + `importLead()` in `InvoiceForm.jsx` |
 
@@ -63,7 +65,7 @@ RLS: authenticated users only; anon reaches data only through the RPC/view.
 ## Cheap-edit habits
 
 Recipes for the likely edits are in `docs/common-edits.md`. Safety checks: `node scripts/check_money.mjs` (tax, discounts, invoice numbers) and
-`python3 scripts/check_prices.py` (Business rates equal biz.aiwithrobert.com); the weekly "Checks" workflow runs both.
+`python3 scripts/check_prices.py` (Business rates equal biz.aiwithrobert.com), `node scripts/check_due_and_export.mjs` (due dates, accountant CSV, tax number format); the weekly "Checks" workflow runs both.
 
 
 - Wording change on a client document: `src/lib/i18n.js` only (EN + FR together).

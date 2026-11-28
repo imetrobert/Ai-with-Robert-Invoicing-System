@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 import { brandOf, brandCssVars, CONTACT } from '../lib/brands'
+import { taxNumberText } from '../lib/taxNumbers'
 import { t, langOf, fmtPct } from '../lib/i18n'
 
 export default function InvoicePublic() {
@@ -140,6 +141,7 @@ export default function InvoicePublic() {
               <div>
                 <MetaRow label={L('dateOfService')} value={formatDate(invoice.service_date, lang)} />
                 <MetaRow label={L('dateIssued')} value={formatDate(utcToETDateStr(invoice.created_at), lang)} />
+                {invoice.due_date && invoice.status !== 'paid' && <MetaRow label={L('dueDate')} value={formatDate(invoice.due_date, lang)} />}
                 <MetaRow label={L('status')} value={L(`status_${invoice.status || 'draft'}`)} />
               </div>
             </div>
@@ -208,6 +210,7 @@ export default function InvoicePublic() {
           <div style={{ background: brand.accent, color: brand.navy, fontWeight: 600, textAlign: 'center', padding: '12px 20px', fontSize: 11 }}>
             {L('thanks')} —{' '}
             {invoice.gst_enabled ? L('taxAt', { label: taxLabel, rate: fmtPct(taxRate, lang) }) : L('taxNA')}
+            {taxNumberText(lang) && <div style={{ marginTop: 4, fontWeight: 500 }}>{taxNumberText(lang)}</div>}
           </div>
         </div>
 

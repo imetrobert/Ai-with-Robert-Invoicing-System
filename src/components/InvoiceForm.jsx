@@ -7,7 +7,7 @@ import { getServices } from '../lib/services'
 import LeadImport, { suggestServiceIds } from './LeadImport'
 import { usualServiceLines } from '../lib/usualServices'
 import { BRAND_LIST, DEFAULT_BRAND, brandOf } from '../lib/brands'
-import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES } from '../lib/invoiceUtils'
+import { generateInvoiceNumber, calculateTotals, formatCAD, getProvinceTaxLabel, getProvinceTaxRate, CANADIAN_PROVINCES, PAYMENT_TERMS, DEFAULT_TERMS_DAYS, addDays, todayET } from '../lib/invoiceUtils'
 
 // Business lines are open-ended (service name + description + qty x rate), so they
 // are stored as 'custom' lines — the same shape Seniors already uses for its
@@ -144,6 +144,7 @@ export default function InvoiceForm() {
   const [discountValue, setDiscountValue] = useState('')
   const [gstEnabled, setGstEnabled] = useState(false)
   const [notes, setNotes] = useState('')
+  const [dueDate, setDueDate] = useState(() => addDays(todayET(), DEFAULT_TERMS_DAYS))
   const [status, setStatus] = useState('draft')
 
   const [allClients, setAllClients] = useState([])
@@ -230,6 +231,7 @@ export default function InvoiceForm() {
     setDiscountValue(data.discount_value || '')
     setGstEnabled(data.gst_enabled || false)
     setNotes(data.notes || '')
+    setDueDate(data.due_date || '')
     setStatus(data.status || 'draft')
     setLoading(false)
   }
@@ -381,6 +383,7 @@ export default function InvoiceForm() {
       discount_amount: totals.discountAmount, gst_enabled: gstEnabled,
       gst_amount: totals.gstAmount, subtotal: totals.subtotal,
       total: totals.total, notes: notes.trim() || null, status,
+      due_date: dueDate || null,
     }
 
     let result
@@ -516,6 +519,21 @@ export default function InvoiceForm() {
               <div className="form-group" style={{ maxWidth: 240 }}>
                 <label className="form-label">Date of Service <span className="required">*</span></label>
                 <input type="date" className="form-control" value={serviceDate} onChange={e => setServiceDate(e.target.value)} required />
+              </div>
+
+              <div className="form-group" style={{ maxWidth: 240 }}>
+                <label className="form-label">Payment due</label>
+                <select
+                  className="form-control"
+                  value=""
+                  onChange={e => { const term = PAYMENT_TERMS.find(x => x.id === e.target.value); if (term) setDueDate(addDays(todayET(), term.days)) }}
+                  aria-label="Payment terms"
+                >
+                  <option value="">Choose terms…</option>
+                  {PAYMENT_TERMS.map(x => <option key={x.id} value={x.id}>{x.label}</option>)}
+                </select>
+                <input type="date" className="form-control" style={{ marginTop: 6 }} value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Terms count from today. Clear the date for no due date. A sent invoice shows as overdue the day after.</div>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
