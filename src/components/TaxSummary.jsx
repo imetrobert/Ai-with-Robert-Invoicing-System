@@ -1,36 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import Navbar from './Navbar'
-import { formatCAD, round2 } from '../lib/invoiceUtils'
-
-const GST_RATE     = 0.05
-const QST_RATE     = 0.09975
-const QC_TAX_RATE  = GST_RATE + QST_RATE  // 0.14975
-
-const HST_PROVINCES = ['ON', 'NB', 'NS', 'NL', 'PE']
-
-function getTaxBreakdown(invoice) {
-  const province = (invoice.province || '').toUpperCase()
-  const taxable  = round2((invoice.subtotal || 0) - (invoice.discount_amount || 0))
-  const taxCollected = invoice.gst_amount || 0
-
-  if (!invoice.gst_enabled || taxCollected === 0) {
-    return { taxable, gstToCRA: 0, hstToCRA: 0, qstToRevQC: 0, province }
-  }
-
-  if (province === 'QC') {
-    const gstToCRA   = round2(taxable * GST_RATE)
-    const qstToRevQC = round2(taxable * QST_RATE)
-    return { taxable, gstToCRA, hstToCRA: 0, qstToRevQC, province }
-  }
-
-  if (HST_PROVINCES.includes(province)) {
-    return { taxable, gstToCRA: 0, hstToCRA: taxCollected, qstToRevQC: 0, province }
-  }
-
-  // GST-only provinces (AB, BC, MB, SK, etc.)
-  return { taxable, gstToCRA: taxCollected, hstToCRA: 0, qstToRevQC: 0, province }
-}
+import { formatCAD, round2, getTaxBreakdown } from '../lib/invoiceUtils'
+import { QUARTERS, inPeriod, buildAccountantCsv, downloadCsv } from '../lib/accountantExport'
 
 function getAvailableYears(invoices) {
   const years = new Set(
@@ -48,6 +20,7 @@ export default function TaxSummary({ session }) {
   const [loading, setLoading]     = useState(true)
   const [taxYear, setTaxYear]     = useState(new Date().getFullYear().toString())
   const [statusFilter, setStatusFilter] = useState('paid')
+  const [period, setPeriod] = useState('all')
   const printRef = useRef()
 
   useEffect(() => {
@@ -55,7 +28,7 @@ export default function TaxSummary({ session }) {
       setLoading(true)
       const { data, error } = await supabase
         .from('invoices')
-        .select('id,invoice_number,client_name,service_date,province,gst_enabled,subtotal,discount_amount,gst_amount,total,status')
+        .select('id,invoice_number,client_name,client_company,brand,service_date,province,gst_enabled,subtotal,discount_amount,gst_amount,total,status')
         .order('service_date', { ascending: true })
       if (!error) setInvoices(data || [])
       setLoading(false)
@@ -66,8 +39,7 @@ export default function TaxSummary({ session }) {
   const availableYears = getAvailableYears(invoices)
 
   const filtered = invoices.filter(inv => {
-    const year = inv.service_date?.substring(0, 4)
-    if (year !== taxYear) return false
+    if (!inPeriod(inv.service_date, taxYear, period)) return false
     if (statusFilter === 'paid') return inv.status === 'paid'
     if (statusFilter === 'sent_paid') return inv.status === 'paid' || inv.status === 'sent'
     return true
@@ -93,6 +65,11 @@ export default function TaxSummary({ session }) {
 
   function handlePrint() {
     window.print()
+  }
+
+  function handleAccountantExport() {
+    const csv = buildAccountantCsv(filtered, { year: taxYear, period, includeLabel: statusLabels[statusFilter] })
+    downloadCsv(csv, `accountant-package-${taxYear}-${period === 'all' ? 'full-year' : period}.csv`)
   }
 
   const statusLabels = {
@@ -131,6 +108,9 @@ export default function TaxSummary({ session }) {
             </svg>
             Print / Save PDF
           </button>
+          <button onClick={handleAccountantExport} className="btn btn-ghost" disabled={filtered.length === 0}>
+            Accountant CSV
+          </button>
         </div>
 
         {/* ── Filters ── */}
@@ -146,6 +126,12 @@ export default function TaxSummary({ session }) {
               {availableYears.map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>PERIOD</label>
+            <select value={period} onChange={e => setPeriod(e.target.value)} className="form-control" style={{ minWidth: 150 }}>
+              {Object.entries(QUARTERS).map(([k, q]) => <option key={k} value={k}>{q.label}</option>)}
             </select>
           </div>
           <div>

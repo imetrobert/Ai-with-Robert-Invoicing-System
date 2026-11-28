@@ -60,3 +60,19 @@ be read, the list falls back to everything not archived.
 The toolkit's Won lead card has "Create invoice" (`#/invoice/new?brand=..&lead_name=..&lead_email=..&lead_org=..&lead_lang=..`). `applyLeadParams()` in `InvoiceForm.jsx` reads those (run once, after the client list loads):
 a returning client (same email) gets saved address and usual services; a new one gets the name, email, company and language, and a suggested service line from their latest `site_inquiries` row (`suggestServiceIds`).
 Change the parameter names in both repos together (toolkit `invoiceUrl()` in index.html).
+
+## Add the GST/QST registration numbers (when you get them)
+1. Open `src/lib/taxNumbers.js` and type them between the quotes of `TAX_NUMBERS`: `gst: '123456789 RT0001'` (CRA, 9 digits + RT0001) and `qst: '1234567890 TQ0001'` (Revenu Quebec, 10 digits + TQ0001). Leave one blank if you only have the other.
+2. Commit to `main`. That is all: filled numbers print by themselves in the PDF footer, on the client invoice page and in the invoice email footer (EN: "GST/HST no.", "QST no."; FR: "N° TPS/TVH", "N° TVQ"). Blank = nothing printed.
+3. `node scripts/check_due_and_export.mjs` (also run weekly by Checks) fails if a number has the wrong shape.
+4. Already-sent invoices do not change in the inbox, but their PDF and client link show the numbers the next time they are opened (the numbers are not stored on the invoice). Only invoice dates after you were registered should show them: if you register mid-year, tell Claude and it will add a "show from date".
+Wording of the labels: `LABELS` in the same file. Where they print: `_drawFooter` in `pdfGenerator.js`, `InvoicePublic.jsx` footer, `emailService.js` footer.
+
+## Due dates, overdue and reminders
+- `invoices.due_date` (date, optional) and `invoices.reminded_at`; migration `supabase/migrations/20261127120000_add_due_date_and_reminders.sql` (run by hand first, then deploy).
+- New invoices default to Net 15 (`DEFAULT_TERMS_DAYS` in `src/lib/invoiceUtils.js`); the form has a terms picker (`PAYMENT_TERMS`) and an editable date. Old invoices have no due date and never show as overdue.
+- Overdue = status Sent + due date before today (Eastern): `daysOverdue()` / `isOverdue()`. Dashboard: red banner, "Overdue" status filter, red tag on the card. Invoice page: "Send reminder" button (sent invoices only) uses `sendInvoiceEmail(invoice, { reminder: true })`, wording keys `reminder*` and `amountOverdue` in `src/lib/i18n.js` (EN + FR), counts toward the EmailJS quota.
+- The due date prints on the PDF, client page and email only while the invoice is unpaid.
+
+## Accountant export
+Tax Summary screen: choose year, period (full year or a quarter, by service date) and what to include, then "Accountant CSV". Logic: `src/lib/accountantExport.js` (summary per brand + both brands, then one row per invoice with GST, HST and QST split; opens in Excel with accents). Tax split per invoice: `getTaxBreakdown()` in `invoiceUtils.js` (shared with the on-screen Tax Summary). Tested by `scripts/check_due_and_export.mjs`.

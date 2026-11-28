@@ -65,6 +65,9 @@ create table if not exists public.invoices (
   client_company     text,
   -- Added 2026-11-10 (see migrations/20261110190000_add_invoice_language.sql)
   language           text                     not null default 'en'::text,
+  -- Added 2026-11-27 (see migrations/20261127120000_add_due_date_and_reminders.sql)
+  due_date           date,
+  reminded_at        timestamp with time zone,
   constraint invoices_language_check check (language in ('en', 'fr')),
   constraint invoices_brand_check check (brand in ('seniors', 'business')),
   constraint invoices_pkey primary key (id),
@@ -176,7 +179,8 @@ with (security_invoker = on) as
     status,
     brand,
     client_company,
-    language
+    language,
+    due_date
    from invoices;
 
 revoke all on table public.invoice_public_v from anon, authenticated, public;

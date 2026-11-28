@@ -24,5 +24,8 @@ jobs:
         run: node scripts/check_money.mjs
       - name: Usual-services pre-fill
         run: node scripts/check_usual_services.mjs
+
+      - name: Due dates, overdue and accountant export
+        run: node scripts/check_due_and_export.mjs
       - name: Business prices match biz.aiwithrobert.com
         run: python3 scripts/check_prices.py

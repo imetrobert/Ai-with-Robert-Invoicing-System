@@ -1,13 +1,15 @@
 import emailjs from '@emailjs/browser'
 import { brandOf, CONTACT } from './brands'
 import { t, langOf, fmtPct } from './i18n'
+import { taxNumberText } from './taxNumbers'
 import { formatCAD, formatDate, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from './invoiceUtils'
 
 const SERVICE_ID  = import.meta.env.VITE_EMAILJS_SERVICE_ID
 const TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
 const PUBLIC_KEY  = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
 
-export async function sendInvoiceEmail(invoice) {
+export async function sendInvoiceEmail(invoice, opts = {}) {
+  const reminder = !!opts.reminder && invoice.status !== 'paid'
   const isPaid   = invoice.status === 'paid'
   const services = Array.isArray(invoice.services) ? invoice.services : []
   const lang     = langOf(invoice)
@@ -28,14 +30,16 @@ export async function sendInvoiceEmail(invoice) {
 
   const greeting = `${L('dear')} <strong>${attn}</strong>,<br><br>
 ${L('trust', { brand: brand.name })}<br>
-${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
+${reminder
+    ? `${L('reminderIntro')} <strong>${formatDate(invoice.service_date, lang)}</strong>, ${invoice.due_date ? `${L('reminderDue')} <strong>${formatDate(invoice.due_date, lang)}</strong>.` : L('reminderUnpaid')}<br>${L('reminderIgnore')}`
+    : `${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`}`
 
   const statusBanner = isPaid
     ? `<div style="margin:24px 0;padding:18px 24px;background:#dcfce7;border:2px solid #16a34a;border-radius:10px;text-align:center;">
         <span style="font-size:22px;font-weight:800;color:#16a34a;letter-spacing:1px;">✅ ${L('paymentReceived')}</span>
        </div>`
     : `<div style="margin:24px 0;padding:18px 24px;background:#fef9c3;border:2px solid #ca8a04;border-radius:10px;text-align:center;">
-        <span style="font-size:22px;font-weight:800;color:#ca8a04;letter-spacing:1px;">⏳ ${L('amountPending')} ${money(total)}</span>
+        <span style="font-size:22px;font-weight:800;color:#ca8a04;letter-spacing:1px;">⏳ ${L(reminder && invoice.due_date && invoice.due_date < new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' }) ? 'amountOverdue' : 'amountPending')} ${money(total)}</span>
        </div>`
 
   const itemRows = services.map(svc => {
@@ -110,6 +114,10 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
                 <td style="font-size:13px;color:#64748b;padding-top:4px;">${L('dateOfService')}</td>
                 <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(invoice.service_date, lang)}</td>
               </tr>
+              ${invoice.due_date && !isPaid ? `<tr>
+                <td style="font-size:13px;color:#64748b;padding-top:4px;">${L('dueDate')}</td>
+                <td style="font-size:13px;color:#1e293b;text-align:right;padding-top:4px;">${formatDate(invoice.due_date, lang)}</td>
+              </tr>` : ''}
             </table>
           </td>
         </tr>
@@ -170,6 +178,7 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
         <tr>
           <td style="background:#1e293b;padding:24px 36px;text-align:center;">
             <div style="font-size:13px;color:#94a3b8;">${brand.name} · Côte Saint-Luc, QC · ${CONTACT.email}</div>
+            ${taxNumberText(lang) ? `<div style="font-size:12px;color:#94a3b8;margin-top:6px;">${taxNumberText(lang)}</div>` : ''}
             <div style="font-size:12px;color:#64748b;margin-top:6px;">© ${new Date().getFullYear()} ${brand.name}. ${L('rights')}</div>
           </td>
         </tr>
@@ -185,7 +194,7 @@ ${L('pleaseFind')} <strong>${formatDate(invoice.service_date, lang)}</strong>.`
     to_name:        invoice.client_name,
     invoice_number: invoice.invoice_number,
     total:          money(total),
-    subject:        L('emailSubject', { num: invoice.invoice_number }),
+    subject:        L(reminder ? 'reminderSubject' : 'emailSubject', { num: invoice.invoice_number }),
     html_body,
   }
 

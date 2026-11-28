@@ -7,7 +7,7 @@ import { generateInvoicePDF } from '../lib/pdfGenerator'
 import { sendInvoiceEmail } from '../lib/emailService'
 import { brandOf, brandCssVars, CONTACT } from '../lib/brands'
 import { t, langOf } from '../lib/i18n'
-import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
+import { formatCAD, formatDate, formatDateShort, STATUS_COLORS, daysOverdue, getProvinceTaxLabel, getProvinceTaxRate, utcToETDateStr } from '../lib/invoiceUtils'
 
 export default function InvoiceView() {
   const { id } = useParams()
@@ -66,6 +66,27 @@ export default function InvoiceView() {
     setEmailLoading(false)
   }
 
+  async function handleReminder() {
+    if (!invoice.client_email) {
+      setEmailMsg({ type: 'error', text: 'No client email on this invoice. Edit it to add one.' })
+      return
+    }
+    setEmailLoading(true); setEmailMsg(null)
+    try {
+      await sendInvoiceEmail(invoice, { reminder: true })
+      logEmailSend(invoice)
+      const now = new Date().toISOString()
+      const emailLog = [...(invoice.email_log || []), now]
+      await supabase.from('invoices').update({ reminded_at: now, email_log: emailLog }).eq('id', id)
+      setInvoice(prev => ({ ...prev, reminded_at: now, email_log: emailLog }))
+      setEmailMsg({ type: 'success', text: `Reminder emailed to ${invoice.client_email}!` })
+    } catch (e) {
+      const msg = e?.text || e?.message || (typeof e === 'string' ? e : JSON.stringify(e)) || 'Unknown error'
+      setEmailMsg({ type: 'error', text: 'Reminder failed: ' + msg })
+    }
+    setEmailLoading(false)
+  }
+
   async function handleStatusChange(newStatus) {
     setStatusSaving(true)
     await supabase.from('invoices').update({ status: newStatus }).eq('id', id)
@@ -94,6 +115,7 @@ export default function InvoiceView() {
   const taxLabel = getProvinceTaxLabel(invoice.province)
   const taxRate = getProvinceTaxRate(invoice.province)
   const brand = brandOf(invoice)
+  const late = daysOverdue(invoice)
 
   return (
     <div className="app-layout">
@@ -107,6 +129,7 @@ export default function InvoiceView() {
           </Link>
           <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--blue)', fontSize: 14 }}>{invoice.invoice_number}</span>
           <span className={`badge badge-${invoice.status}`}>{sc.label}</span>
+          {late > 0 && <span className="badge badge-overdue">Overdue {late} day{late !== 1 ? 's' : ''}</span>}
           {invoice.emailed_at && (
             <span style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 4 }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
@@ -132,6 +155,11 @@ export default function InvoiceView() {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             {emailLoading ? 'Sending…' : 'Email Invoice'}
           </button>
+          {invoice.status === 'sent' && (
+            <button className="btn btn-sm" style={{ background: '#fef2f2', color: '#b91c1c', border: '1px solid #fca5a5' }} onClick={handleReminder} disabled={emailLoading}>
+              {emailLoading ? 'Sending…' : (invoice.reminded_at ? 'Send another reminder' : 'Send reminder')}
+            </button>
+          )}
           <button className="btn btn-danger btn-sm" onClick={() => setShowDeleteModal(true)}>Delete</button>
         </div>
 
@@ -174,6 +202,8 @@ export default function InvoiceView() {
               <div style={{ textAlign: 'right' }}>
                 <MetaRow label="Service Date" value={formatDate(invoice.service_date)} />
                 <MetaRow label="Issued" value={formatDate(utcToETDateStr(invoice.created_at))} />
+                {invoice.due_date && <MetaRow label="Due" value={formatDate(invoice.due_date)} />}
+                {invoice.reminded_at && <MetaRow label="Reminded" value={formatDate(utcToETDateStr(invoice.reminded_at))} />}
                 {invoice.emailed_at && <MetaRow label="Emailed" value={formatDate(utcToETDateStr(invoice.emailed_at))} />}
               </div>
             </div>

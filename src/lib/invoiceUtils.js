@@ -107,6 +107,34 @@ export function formatCAD(amount, lang = 'en') {
   }).format(amount)
 }
 
+// ── Payment terms and overdue ────────────────────────────────────────────────
+// due_date is a plain date (YYYY-MM-DD). An invoice is overdue when it has been
+// SENT, has a due date, and that date is before today (Eastern Time).
+export const PAYMENT_TERMS = [
+  { id: 'receipt', label: 'Due on receipt', days: 0 },
+  { id: 'net7',    label: 'Net 7',          days: 7 },
+  { id: 'net15',   label: 'Net 15',         days: 15 },
+  { id: 'net30',   label: 'Net 30',         days: 30 },
+]
+export const DEFAULT_TERMS_DAYS = 15
+
+export function todayET() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' })
+}
+
+export function addDays(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+
+export function daysOverdue(inv, today = todayET()) {
+  if (!inv || !inv.due_date || inv.status !== 'sent') return 0
+  const diff = Math.round((Date.parse(today) - Date.parse(inv.due_date)) / 86400000)
+  return diff > 0 ? diff : 0
+}
+
+export const isOverdue = (inv, today) => daysOverdue(inv, today) > 0
+
 export const STATUS_COLORS = {
   draft: { bg: '#f1f5f9', text: '#64748b', label: 'Draft' },
   sent:  { bg: '#dbeafe', text: '#1d4ed8', label: 'Sent' },
@@ -126,3 +154,26 @@ export const CANADIAN_PROVINCES = [
   { code: 'QC', label: 'Quebec (GST+QST 14.975%)' },
   { code: 'SK', label: 'Saskatchewan (GST 5%)' },
 ]
+
+// ── Tax breakdown per invoice (used by Tax Summary and the accountant export) ──
+const GST_RATE = 0.05
+const QST_RATE = 0.09975
+const HST_PROVINCES = ['ON', 'NB', 'NS', 'NL', 'PE']
+
+export function getTaxBreakdown(invoice) {
+  const province = (invoice.province || '').toUpperCase()
+  const taxable  = round2((invoice.subtotal || 0) - (invoice.discount_amount || 0))
+  const taxCollected = invoice.gst_amount || 0
+
+  if (!invoice.gst_enabled || taxCollected === 0) {
+    return { taxable, gstToCRA: 0, hstToCRA: 0, qstToRevQC: 0, province }
+  }
+  if (province === 'QC') {
+    return { taxable, gstToCRA: round2(taxable * GST_RATE), hstToCRA: 0, qstToRevQC: round2(taxable * QST_RATE), province }
+  }
+  if (HST_PROVINCES.includes(province)) {
+    return { taxable, gstToCRA: 0, hstToCRA: taxCollected, qstToRevQC: 0, province }
+  }
+  // GST-only provinces (AB, BC, MB, SK, etc.)
+  return { taxable, gstToCRA: taxCollected, hstToCRA: 0, qstToRevQC: 0, province }
+}
